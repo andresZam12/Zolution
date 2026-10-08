@@ -104,7 +104,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div>
                 <h1 className="font-bold text-base leading-tight tracking-tight">Zolution</h1>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Agentic AI Clinic</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Universal Agentic AI</p>
               </div>
             </div>
             <Badge variant="outline" className="text-[10px] font-mono border-indigo-200 dark:border-indigo-900/60 text-indigo-600 dark:text-indigo-400">
@@ -112,17 +112,29 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </Badge>
           </div>
 
-          {/* Tenant Selector Pill */}
-          <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/50">
+          {/* Dynamic Tenant Selector Pill with link to switch company */}
+          <Link
+            href="/login"
+            title="Clic para cambiar de empresa o tenant"
+            className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/50 transition-colors group cursor-pointer"
+          >
             <div className="flex items-center gap-2 overflow-hidden">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <div className="truncate text-left">
-                <p className="text-xs font-semibold truncate">Dental Care Clinic</p>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">Tenant #1</p>
+                <p className="text-xs font-semibold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                  {typeof window !== "undefined"
+                    ? localStorage.getItem("zolution_org_name") || "Dental Care Clinic"
+                    : "Dental Care Clinic"}
+                </p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                  {typeof window !== "undefined"
+                    ? localStorage.getItem("zolution_org_industry") || "Organización Activa"
+                    : "Organización Activa"}
+                </p>
               </div>
             </div>
             <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-          </div>
+          </Link>
         </div>
 
         {/* Navigation Links */}

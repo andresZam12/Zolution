@@ -90,13 +90,13 @@ export default function OverviewPage() {
         <div className="relative z-10 max-w-2xl space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur-md">
             <Zap className="h-3.5 w-3.5 text-amber-300" />
-            <span>Sistema Multitenant Operativo</span>
+            <span>Sistema Multi-Tenant Empresarial Operativo</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Panel de Control del Agente Clínico
+            Panel de Control del Agente Inteligente
           </h2>
           <p className="text-sm sm:text-base text-indigo-100/90 leading-relaxed">
-            Tu asistente de IA está activo atendiendo pacientes en WhatsApp, sincronizando citas con Google Calendar y respondiendo dudas en segundos.
+            Tu asistente de IA está activo atendiendo clientes por WhatsApp, agendando citas en tiempo real en Google Calendar y resolviendo dudas 24/7 para tu empresa.
           </p>
           <div className="pt-2 flex flex-wrap gap-3">
             <Link
