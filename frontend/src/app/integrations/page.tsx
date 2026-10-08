@@ -22,7 +22,8 @@ export default function IntegrationsPage() {
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
-  const webhookUrl = "https://api.zolution.app/api/v1/webhooks/whatsapp";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+  const webhookUrl = `${apiBase}/webhooks/whatsapp`;
   const verifyToken = "zol_verify_sec_9941a";
 
   const handleCopy = (text: string, type: "webhook" | "token") => {
@@ -37,9 +38,8 @@ export default function IntegrationsPage() {
   };
 
   const handleGoogleOAuthConnect = () => {
-    // In production, redirects to backend OAuth endpoint:
-    // window.location.href = "http://localhost:8000/api/v1/integrations/google/authorize";
-    alert("Redirigiendo a Google OAuth2 para autorización de Google Calendar...");
+    // Redirect to backend OAuth initiation endpoint
+    window.location.href = `${apiBase}/integrations/google/authorize`;
   };
 
   return (
