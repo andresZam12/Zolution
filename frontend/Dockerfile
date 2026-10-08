@@ -1,21 +1,21 @@
 # =============================================================================
-# Zolution Frontend — Dockerfile
-# Development: Angular CLI dev server with hot-reload.
-# Production: TODO (Phase 4) — build and serve via nginx.
+# Zolution Frontend — Dockerfile (Next.js)
 # =============================================================================
 
 FROM node:20-alpine AS dev
 
 WORKDIR /app
 
-# Copy package manifests first for layer caching
+# Copy package manifests
 COPY package.json package-lock.json ./
-RUN npm ci --prefer-offline
+RUN npm install
 
-# Copy source (node_modules excluded via .dockerignore)
+# Copy source code
 COPY . .
 
-EXPOSE 4200
+EXPOSE 3000
 
-# --host 0.0.0.0 required to be accessible from outside the container
-CMD ["npx", "ng", "serve", "--host", "0.0.0.0", "--poll", "500"]
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["npm", "run", "dev"]

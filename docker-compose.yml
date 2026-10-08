@@ -48,7 +48,7 @@ services:
       - zolution_net
 
   # ---------------------------------------------------------------------------
-  # Angular frontend (dev server)
+  # Next.js frontend (dev server)
   # ---------------------------------------------------------------------------
   frontend:
     build:
@@ -56,10 +56,8 @@ services:
       dockerfile: Dockerfile
     container_name: zolution_frontend
     restart: unless-stopped
-    env_file:
-      - ./frontend/.env
     ports:
-      - "4200:4200"
+      - "3000:3000"
     volumes:
       # Mount source for hot-reload; node_modules excluded via named volume
       - ./frontend:/app
