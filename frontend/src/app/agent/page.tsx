@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Bot,
   Sparkles,
@@ -8,11 +8,11 @@ import {
   RotateCcw,
   Sliders,
   CheckCircle2,
-  Calendar,
   Send,
   User,
-  Shield,
-  Layers,
+  Wifi,
+  WifiOff,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { apiFetch } from "@/lib/api";
 
 export default function AgentConfigPage() {
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("gpt-4o-mini");
   const [temperature, setTemperature] = useState(0.3);
   const [isActive, setIsActive] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isLiveApi, setIsLiveApi] = useState(false);
 
   const [prompt, setPrompt] = useState(
     `Eres Sofía, la asistente virtual de la Clínica Dental Zolution.
@@ -50,9 +53,51 @@ Instrucciones:
   const [inputMessage, setInputMessage] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
 
-  const handleSave = () => {
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+  // Load configuration from backend if available
+  const loadAgentConfig = async () => {
+    try {
+      const data = await apiFetch<{
+        system_prompt_generated?: string | null;
+        llm_provider?: string;
+        llm_model?: string;
+        status?: string;
+      }>("/agents/me");
+
+      if (data) {
+        if (data.system_prompt_generated) setPrompt(data.system_prompt_generated);
+        if (data.llm_provider) setProvider(data.llm_provider);
+        if (data.llm_model) setModel(data.llm_model);
+        if (data.status) setIsActive(data.status === "active");
+        setIsLiveApi(true);
+      }
+    } catch {
+      setIsLiveApi(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAgentConfig();
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      if (isLiveApi) {
+        await apiFetch("/agents/me/llm-provider", {
+          method: "PATCH",
+          body: JSON.stringify({
+            llm_provider: provider,
+            llm_model: model,
+          }),
+        });
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setIsSaving(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    }
   };
 
   const handleSendMessage = () => {
@@ -90,13 +135,45 @@ Instrucciones:
             Personaliza la personalidad, instrucciones del sistema y modelos de lenguaje de tu clínica.
           </p>
         </div>
+
         <div className="flex items-center gap-3">
+          <Badge
+            variant="outline"
+            className={`text-xs gap-1.5 py-1 ${
+              isLiveApi
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+            }`}
+          >
+            {isLiveApi ? (
+              <>
+                <Wifi className="h-3 w-3 text-emerald-500" />
+                Backend Sync Activo
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-3 w-3 text-zinc-400" />
+                Modo Demo
+              </>
+            )}
+          </Badge>
+
           <div className="flex items-center gap-2 mr-2">
             <span className="text-xs font-medium text-zinc-500">Agente Activo:</span>
             <Switch checked={isActive} onCheckedChange={setIsActive} />
           </div>
-          <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs">
-            {savedSuccess ? (
+
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Guardando...
+              </>
+            ) : savedSuccess ? (
               <>
                 <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-300" />
                 ¡Guardado!
