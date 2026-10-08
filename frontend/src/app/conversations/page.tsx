@@ -1,21 +1,30 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  MessageSquare,
   Search,
   Bot,
   User,
   Clock,
-  CheckCheck,
-  Calendar,
   Sparkles,
   Phone,
-  Shield,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api";
+
+interface MessageItem {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at?: string;
+  time?: string;
+  toolCall?: string;
+}
 
 interface ConversationItem {
   id: string;
@@ -23,24 +32,18 @@ interface ConversationItem {
   phone: string;
   lastMessage: string;
   time: string;
-  unread: boolean;
-  messages: {
-    id: string;
-    role: "user" | "assistant";
-    content: string;
-    time: string;
-    toolCall?: string;
-  }[];
+  status: string;
+  messages: MessageItem[];
 }
 
-const mockConversations: ConversationItem[] = [
+const fallbackConversations: ConversationItem[] = [
   {
     id: "conv-1",
     customerName: "María Gómez",
     phone: "+57 310 987 6543",
     lastMessage: "¡Perfecto, nos vemos el jueves a las 10:00 AM!",
     time: "10:42 AM",
-    unread: false,
+    status: "active",
     messages: [
       {
         id: "m1",
@@ -88,7 +91,7 @@ const mockConversations: ConversationItem[] = [
     phone: "+57 312 456 7890",
     lastMessage: "¿Qué costo tiene la limpieza con ultrasonido?",
     time: "Ayer",
-    unread: true,
+    status: "active",
     messages: [
       {
         id: "m7",
@@ -110,7 +113,7 @@ const mockConversations: ConversationItem[] = [
     phone: "+57 301 234 5678",
     lastMessage: "Gracias por la información, lo reviso con mi familia.",
     time: "Lunes",
-    unread: false,
+    status: "active",
     messages: [
       {
         id: "m9",
@@ -135,10 +138,84 @@ const mockConversations: ConversationItem[] = [
 ];
 
 export default function ConversationsPage() {
-  const [selectedConv, setSelectedConv] = useState<ConversationItem>(mockConversations[0]);
+  const [conversations, setConversations] = useState<ConversationItem[]>(fallbackConversations);
+  const [selectedConv, setSelectedConv] = useState<ConversationItem>(fallbackConversations[0]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLiveApi, setIsLiveApi] = useState(false);
 
-  const filteredConversations = mockConversations.filter(
+  const loadConversations = async () => {
+    setIsLoading(true);
+    try {
+      const data = await apiFetch<{
+        items: Array<{
+          id: string;
+          customer_name: string | null;
+          customer_phone: string;
+          status: string;
+          updated_at: string;
+          last_message: { content: string; created_at: string } | null;
+        }>;
+        total: number;
+      }>("/conversations");
+
+      if (data && data.items && data.items.length > 0) {
+        const mapped: ConversationItem[] = data.items.map((item) => ({
+          id: item.id,
+          customerName: item.customer_name || "Paciente WhatsApp",
+          phone: item.customer_phone,
+          lastMessage: item.last_message?.content || "Sin mensajes",
+          time: new Date(item.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          status: item.status,
+          messages: [],
+        }));
+        setConversations(mapped);
+        setSelectedConv(mapped[0]);
+        setIsLiveApi(true);
+      } else {
+        setIsLiveApi(false);
+      }
+    } catch {
+      // Fallback gracefully to demo conversations if API is offline
+      setIsLiveApi(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  const handleSelectConversation = async (conv: ConversationItem) => {
+    setSelectedConv(conv);
+    if (isLiveApi) {
+      try {
+        const detail = await apiFetch<{
+          messages: Array<{
+            id: string;
+            role: "user" | "assistant";
+            content: string;
+            created_at: string;
+          }>;
+        }>(`/conversations/${conv.id}`);
+
+        if (detail && detail.messages) {
+          const formattedMessages: MessageItem[] = detail.messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          }));
+          setSelectedConv((prev) => ({ ...prev, messages: formattedMessages }));
+        }
+      } catch {
+        // Keep current messages
+      }
+    }
+  };
+
+  const filteredConversations = conversations.filter(
     (c) =>
       c.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.phone.includes(searchTerm)
@@ -146,11 +223,47 @@ export default function ConversationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Historial de Conversaciones</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Supervisa los chats atendidos automáticamente por tu agente en WhatsApp.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Historial de Conversaciones</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Supervisa los chats atendidos automáticamente por tu agente en WhatsApp.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Badge
+            variant="outline"
+            className={`text-xs gap-1.5 py-1 ${
+              isLiveApi
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+            }`}
+          >
+            {isLiveApi ? (
+              <>
+                <Wifi className="h-3 w-3 text-emerald-500" />
+                Backend Live API
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-3 w-3 text-zinc-400" />
+                Modo Demo Local
+              </>
+            )}
+          </Badge>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={loadConversations}
+            disabled={isLoading}
+            className="text-xs h-8"
+          >
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[720px]">
@@ -169,7 +282,7 @@ export default function ConversationsPage() {
             <div className="flex items-center justify-between text-xs text-zinc-500">
               <span>{filteredConversations.length} conversaciones</span>
               <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 WhatsApp Live
               </span>
             </div>
@@ -181,7 +294,7 @@ export default function ConversationsPage() {
               return (
                 <button
                   key={conv.id}
-                  onClick={() => setSelectedConv(conv)}
+                  onClick={() => handleSelectConversation(conv)}
                   className={`w-full text-left p-4 transition-colors flex items-start gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
                     isSelected ? "bg-indigo-50/60 dark:bg-indigo-950/40 border-l-4 border-indigo-600" : ""
                   }`}
