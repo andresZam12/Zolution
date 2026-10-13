@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Zolution — Multi-Tenant Agentic AI Platform",
-  description: "AI-powered appointment scheduling and WhatsApp automation for healthcare and clinics",
+  title: "Zolution — Universal Multi-Tenant Agentic AI Platform",
+  description: "Universal AI-powered WhatsApp automation, customer engagement, and appointment scheduling for any business.",
 };
 
 export default function RootLayout({

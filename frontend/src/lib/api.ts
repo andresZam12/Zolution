@@ -2,7 +2,17 @@
  * API client configuration and helper for Zolution Backend.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+function getApiBaseUrl(): string {
+  let base = process.env.NEXT_PUBLIC_API_URL || "https://zolution-api.onrender.com";
+  base = base.trim().replace(/\/+$/, "");
+  if (!base.endsWith("/api/v1")) {
+    base = `${base}/api/v1`;
+  }
+  return base;
+}
+
+const API_BASE_URL = getApiBaseUrl();
+
 
 interface RequestOptions extends RequestInit {
   organizationId?: string;
