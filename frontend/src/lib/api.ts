@@ -39,7 +39,9 @@ export async function apiFetch<T>(endpoint: string, options: RequestOptions = {}
 
   const activeToken =
     token ||
-    (typeof window !== "undefined" ? localStorage.getItem("zolution_auth_token") : undefined);
+    (typeof window !== "undefined"
+      ? localStorage.getItem("zolution_auth_token") || localStorage.getItem("zolution_token")
+      : undefined);
 
   if (activeToken) {
     resolvedHeaders["Authorization"] = `Bearer ${activeToken}`;

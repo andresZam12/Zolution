@@ -29,6 +29,12 @@ services:
         sync: false
       - key: GOOGLE_API_KEY
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
       - key: WHATSAPP_VERIFY_TOKEN
         value: zol_verify_sec_9941a
 
