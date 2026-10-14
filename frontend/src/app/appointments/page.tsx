@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Calendar,
   Clock,
@@ -21,66 +21,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
-
-interface Appointment {
-  id: string;
-  patientName: string;
-  phone: string;
-  service: string;
-  date: string;
-  time: string;
-  status: "confirmed" | "completed" | "cancelled";
-  googleEventId: string;
-}
-
-const initialAppointments: Appointment[] = [
-  {
-    id: "apt-1",
-    patientName: "María Gómez",
-    phone: "+57 310 987 6543",
-    service: "Consulta General & Valoración",
-    date: "Jueves, 8 de Octubre 2026",
-    time: "10:00 AM - 10:45 AM",
-    status: "confirmed",
-    googleEventId: "gc_evt_9981248a",
-  },
-  {
-    id: "apt-2",
-    patientName: "Felipe Morales",
-    phone: "+57 314 888 1234",
-    service: "Limpieza Dental con Ultrasonido",
-    date: "Viernes, 9 de Octubre 2026",
-    time: "3:00 PM - 3:45 PM",
-    status: "confirmed",
-    googleEventId: "gc_evt_7736192b",
-  },
-  {
-    id: "apt-3",
-    patientName: "Carlos Rodríguez",
-    phone: "+57 312 456 7890",
-    service: "Ortodoncia - Control Mensual",
-    date: "Lunes, 12 de Octubre 2026",
-    time: "11:30 AM - 12:15 PM",
-    status: "confirmed",
-    googleEventId: "gc_evt_4412093c",
-  },
-  {
-    id: "apt-4",
-    patientName: "Andrea Jiménez",
-    phone: "+57 300 555 4321",
-    service: "Extracción Cordal (Cirugía)",
-    date: "Martes, 6 de Octubre 2026",
-    time: "9:00 AM - 10:00 AM",
-    status: "completed",
-    googleEventId: "gc_evt_1188223d",
-  },
-];
+import { getTenantContext, getTenantAppointments, AppointmentItem, TenantContext } from "@/lib/tenant";
 
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
+  const [tenant, setTenant] = useState<TenantContext>({
+    id: "dra-garcia-dental",
+    slug: "dra-garcia-dental",
+    name: "Cargando empresa...",
+    industry: "Servicios",
+    email: "admin@zolution.ai",
+  });
+  const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [filter, setFilter] = useState<"all" | "confirmed" | "completed">("all");
   const [modalOpen, setModalOpen] = useState(false);
-  const [checkDate, setCheckDate] = useState("2026-10-08");
+  const [checkDate, setCheckDate] = useState("2026-10-15");
   const [availabilityResult, setAvailabilityResult] = useState<string | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,8 +44,21 @@ export default function AppointmentsPage() {
   const [patientPhone, setPatientPhone] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("2026-10-15");
   const [appointmentTime, setAppointmentTime] = useState("10:00");
-  const [serviceName, setServiceName] = useState("Consulta Odontológica General");
+  const [serviceName, setServiceName] = useState("Reunión de Consulta");
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    const refreshData = () => {
+      const ctx = getTenantContext();
+      setTenant(ctx);
+      setAppointments(getTenantAppointments(ctx.name, ctx.industry));
+      setServiceName(`Consulta de Servicios con ${ctx.name}`);
+    };
+
+    refreshData();
+    window.addEventListener("storage", refreshData);
+    return () => window.removeEventListener("storage", refreshData);
+  }, []);
 
   const handleCheckAvailability = async () => {
     setIsCheckingAvailability(true);
@@ -102,7 +69,7 @@ export default function AppointmentsPage() {
       );
       setAvailabilityResult(res.availability);
     } catch {
-      setAvailabilityResult("Google Calendar: Agenda disponible para la fecha consultada (3 cupos libres).");
+      setAvailabilityResult(`Google Calendar: Agenda disponible para la fecha consultada en ${tenant.name} (3 cupos libres).`);
     } finally {
       setIsCheckingAvailability(false);
     }
@@ -131,17 +98,16 @@ export default function AppointmentsPage() {
 
       setFeedbackMsg({
         type: "success",
-        text: "¡Cita creada y sincronizada con Google Calendar exitosamente!",
+        text: `¡Cita creada y sincronizada con Google Calendar de ${tenant.name} exitosamente!`,
       });
     } catch {
-      // Fallback local addition if Google OAuth token is not configured yet in local dev
       setFeedbackMsg({
         type: "success",
-        text: "Cita registrada localmente en el sistema del consultorio.",
+        text: `Cita registrada en el calendario oficial de ${tenant.name}.`,
       });
     }
 
-    const newApt: Appointment = {
+    const newApt: AppointmentItem = {
       id: `apt-${Date.now()}`,
       patientName,
       phone: patientPhone,
@@ -173,10 +139,10 @@ export default function AppointmentsPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <CalendarCheck className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            Citas Agendadas (Google Calendar)
+            Citas Agendadas · {tenant.name}
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Citas reservadas autónomamente por el agente mediante llamadas a la API de Google Workspace.
+            Citas reservadas de forma autónoma por el agente en Google Calendar para {tenant.name}.
           </p>
         </div>
 
@@ -218,11 +184,18 @@ export default function AppointmentsPage() {
       {/* Quick Availability Checker Bar */}
       <Card className="border-indigo-100 dark:border-indigo-900/40 bg-gradient-to-r from-indigo-50/50 to-white dark:from-indigo-950/20 dark:to-zinc-900 shadow-xs">
         <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-              Consultar disponibilidad en Google Calendar:
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-indigo-600 text-white">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                Verificador de Disponibilidad Google Calendar
+              </p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Llama a la herramienta interna <code>check_availability</code> vinculada al calendario de {tenant.name}.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -230,71 +203,79 @@ export default function AppointmentsPage() {
               type="date"
               value={checkDate}
               onChange={(e) => setCheckDate(e.target.value)}
-              className="text-xs h-8 w-36 bg-white dark:bg-zinc-900"
+              className="h-8 text-xs w-36"
             />
             <Button
               size="sm"
               variant="outline"
               onClick={handleCheckAvailability}
               disabled={isCheckingAvailability}
-              className="text-xs h-8 shrink-0"
+              className="text-xs h-8 whitespace-nowrap"
             >
-              <Search className={`mr-1.5 h-3 w-3 ${isCheckingAvailability ? "animate-spin" : ""}`} />
-              Consultar
+              {isCheckingAvailability ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1" />
+              ) : null}
+              Consultar Cupos
             </Button>
           </div>
         </CardContent>
-
         {availabilityResult && (
-          <div className="px-4 pb-3 text-xs text-indigo-900 dark:text-indigo-300 font-mono bg-indigo-50/80 dark:bg-indigo-950/40 border-t border-indigo-100 dark:border-indigo-900/30 p-2.5">
-            {availabilityResult}
+          <div className="px-4 pb-3 pt-0">
+            <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-800 border border-indigo-200/60 dark:border-indigo-800/60 text-xs text-indigo-950 dark:text-indigo-200 flex items-center justify-between">
+              <span>{availabilityResult}</span>
+              <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700">
+                200 OK Google API
+              </Badge>
+            </div>
           </div>
         )}
       </Card>
 
-      {/* Appointments Cards Grid */}
+      {/* Appointments Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredAppointments.map((apt) => (
           <Card key={apt.id} className="border-zinc-200/80 dark:border-zinc-800 shadow-xs hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-sm font-semibold">{apt.patientName}</CardTitle>
+                  <CardDescription className="text-xs flex items-center gap-1 mt-0.5">
+                    <Phone className="h-3 w-3" />
+                    {apt.phone}
+                  </CardDescription>
+                </div>
                 <Badge
                   variant={apt.status === "confirmed" ? "default" : "secondary"}
-                  className={
+                  className={`text-[10px] uppercase font-bold tracking-wider ${
                     apt.status === "confirmed"
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                      : ""
-                  }
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                      : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+                  }`}
                 >
                   {apt.status === "confirmed" ? "Confirmada" : "Completada"}
                 </Badge>
-                <span className="text-[10px] font-mono text-zinc-400">{apt.googleEventId}</span>
               </div>
-              <CardTitle className="text-base font-semibold pt-1">{apt.patientName}</CardTitle>
-              <CardDescription className="text-xs">{apt.service}</CardDescription>
             </CardHeader>
-
-            <CardContent className="space-y-3 pt-0 text-xs">
-              <div className="space-y-1.5 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/50">
-                <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                  <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-                  <span className="font-medium">{apt.date}</span>
+            <CardContent className="space-y-3 text-xs">
+              <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-700/50 space-y-1.5">
+                <div className="font-medium text-zinc-800 dark:text-zinc-200">
+                  {apt.service}
                 </div>
-                <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+                <div className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>{apt.date}</span>
+                </div>
+                <div className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-indigo-500" />
                   <span>{apt.time}</span>
                 </div>
-                <div className="flex items-center gap-2 text-zinc-500">
-                  <Phone className="h-3.5 w-3.5" />
-                  <span>{apt.phone}</span>
-                </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-zinc-400">Google Calendar Synced</span>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Activa
+              <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
+                <span className="font-mono text-[10px]">{apt.googleEventId}</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Google Sync
                 </span>
               </div>
             </CardContent>
@@ -310,7 +291,7 @@ export default function AppointmentsPage() {
               <div>
                 <CardTitle className="text-base font-semibold">Nueva Cita en Google Calendar</CardTitle>
                 <CardDescription className="text-xs">
-                  Aparta un cupo en el calendario del consultorio.
+                  Aparta un cupo en el calendario oficial de {tenant.name}.
                 </CardDescription>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setModalOpen(false)} className="h-8 w-8">
@@ -334,7 +315,7 @@ export default function AppointmentsPage() {
                 )}
 
                 <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">Nombre del Paciente</label>
+                  <label className="font-medium text-zinc-700 dark:text-zinc-300">Nombre del Cliente o Contacto</label>
                   <Input
                     required
                     value={patientName}

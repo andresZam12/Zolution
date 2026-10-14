@@ -27,12 +27,22 @@ export async function apiFetch<T>(endpoint: string, options: RequestOptions = {}
     ...(headers as Record<string, string>),
   };
 
-  if (organizationId) {
-    resolvedHeaders["X-Organization-ID"] = organizationId;
+  const activeOrg =
+    organizationId ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("zolution_org_slug") || localStorage.getItem("zolution_org_id")
+      : undefined);
+
+  if (activeOrg) {
+    resolvedHeaders["X-Organization-ID"] = activeOrg;
   }
 
-  if (token) {
-    resolvedHeaders["Authorization"] = `Bearer ${token}`;
+  const activeToken =
+    token ||
+    (typeof window !== "undefined" ? localStorage.getItem("zolution_auth_token") : undefined);
+
+  if (activeToken) {
+    resolvedHeaders["Authorization"] = `Bearer ${activeToken}`;
   }
 
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;

@@ -1,3 +1,6 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Bot,
@@ -12,11 +15,33 @@ import {
   Zap,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getTenantContext, getTenantEvents, TenantContext, ActivityEvent } from "@/lib/tenant";
 
 export default function OverviewPage() {
+  const [tenant, setTenant] = useState<TenantContext>({
+    id: "dra-garcia-dental",
+    slug: "dra-garcia-dental",
+    name: "Cargando empresa...",
+    industry: "Servicios",
+    email: "admin@zolution.ai",
+  });
+  const [recentEvents, setRecentEvents] = useState<ActivityEvent[]>([]);
+
+  useEffect(() => {
+    const refreshTenant = () => {
+      const ctx = getTenantContext();
+      setTenant(ctx);
+      setRecentEvents(getTenantEvents(ctx.name, ctx.industry));
+    };
+
+    refreshTenant();
+    window.addEventListener("storage", refreshTenant);
+    return () => window.removeEventListener("storage", refreshTenant);
+  }, []);
+
   const stats = [
     {
       title: "Conversaciones Totales",
@@ -48,41 +73,6 @@ export default function OverviewPage() {
     },
   ];
 
-  const recentEvents = [
-    {
-      id: "1",
-      customer: "María Gómez",
-      action: "Cita confirmada para Consulta General",
-      time: "Hace 12 min",
-      tool: "book_appointment",
-      status: "success",
-    },
-    {
-      id: "2",
-      customer: "Carlos Rodriguez",
-      action: "Consulta de disponibilidad para el viernes",
-      time: "Hace 34 min",
-      tool: "check_availability",
-      status: "success",
-    },
-    {
-      id: "3",
-      customer: "Laura Restrepo",
-      action: "Pregunta sobre tarifas de ortodoncia",
-      time: "Hace 1 hora",
-      tool: "llm_answer",
-      status: "info",
-    },
-    {
-      id: "4",
-      customer: "Felipe Morales",
-      action: "Cita reagendada para Limpieza Dental",
-      time: "Hace 2 horas",
-      tool: "book_appointment",
-      status: "success",
-    },
-  ];
-
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
@@ -90,13 +80,13 @@ export default function OverviewPage() {
         <div className="relative z-10 max-w-2xl space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur-md">
             <Zap className="h-3.5 w-3.5 text-amber-300" />
-            <span>Sistema Multi-Tenant Empresarial Operativo</span>
+            <span>Sistema Multi-Tenant Operativo · {tenant.industry}</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Panel de Control del Agente Inteligente
+            Panel de Control de {tenant.name}
           </h2>
           <p className="text-sm sm:text-base text-indigo-100/90 leading-relaxed">
-            Tu asistente de IA está activo atendiendo clientes por WhatsApp, agendando citas en tiempo real en Google Calendar y resolviendo dudas 24/7 para tu empresa.
+            Tu asistente de IA está activo atendiendo clientes por WhatsApp, agendando citas en tiempo real en Google Calendar y resolviendo dudas 24/7 para {tenant.name}.
           </p>
           <div className="pt-2 flex flex-wrap gap-3">
             <Link
@@ -154,7 +144,7 @@ export default function OverviewPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base font-semibold">Actividad Reciente del Agente</CardTitle>
-              <CardDescription>Eventos y llamadas de herramientas en tiempo real</CardDescription>
+              <CardDescription>Eventos y llamadas de herramientas en tiempo real para {tenant.name}</CardDescription>
             </div>
             <Link
               href="/conversations"
@@ -216,6 +206,14 @@ export default function OverviewPage() {
                 <span className="text-emerald-600 dark:text-emerald-400 font-medium">Activo (PostgreSQL)</span>
               </div>
               <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Empresa / Tenant</span>
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate max-w-[150px]">{tenant.name}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-zinc-500">Industria</span>
+                <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[150px]">{tenant.industry}</span>
+              </div>
+              <div className="flex justify-between text-xs">
                 <span className="text-zinc-500">Proveedor de IA</span>
                 <span className="font-medium text-zinc-800 dark:text-zinc-200">OpenAI / Claude</span>
               </div>
@@ -235,7 +233,7 @@ export default function OverviewPage() {
                 Agente Autónomo
               </p>
               <p className="text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed">
-                El agente utiliza el schema de herramientas de la Fase 6 para verificar disponibilidad y apartar citas directamente en el calendario del consultorio.
+                El agente de {tenant.name} utiliza el schema de herramientas para verificar disponibilidad y apartar citas directamente en el calendario oficial de {tenant.name}.
               </p>
             </div>
 
@@ -244,7 +242,7 @@ export default function OverviewPage() {
                 href="/settings"
                 className={cn(buttonVariants({ variant: "outline" }), "w-full text-xs text-center justify-center")}
               >
-                Ver Ajustes de la Organización
+                Ver Ajustes de {tenant.name}
               </Link>
             </div>
           </CardContent>

@@ -21,8 +21,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { apiFetch } from "@/lib/api";
+import { getTenantContext, generateDefaultPrompt, TenantContext } from "@/lib/tenant";
 
 export default function AgentConfigPage() {
+  const [tenant, setTenant] = useState<TenantContext>({
+    id: "dra-garcia-dental",
+    slug: "dra-garcia-dental",
+    name: "Cargando empresa...",
+    industry: "Servicios",
+    email: "admin@zolution.ai",
+  });
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("gpt-4o-mini");
   const [temperature, setTemperature] = useState(0.3);
@@ -31,30 +39,28 @@ export default function AgentConfigPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isLiveApi, setIsLiveApi] = useState(false);
 
-  const [prompt, setPrompt] = useState(
-    `Eres Sofía, la asistente virtual de la Clínica Dental Zolution.
-Tu objetivo es atender a los pacientes por WhatsApp con calidez, responder dudas sobre tratamientos dentales y agendar sus citas de manera eficiente.
-
-Horario de atención:
-- Lunes a Viernes: 8:00 AM - 6:00 PM
-- Sábados: 9:00 AM - 1:00 PM
-
-Instrucciones:
-1. Sé cordial, empática y profesional.
-2. Si el paciente pregunta por citas, SIEMPRE consulta primero la disponibilidad con la herramienta check_availability antes de proponer horarios.
-3. Una vez el paciente elija un horario válido y confirme sus datos (nombre completo y teléfono), usa book_appointment para agendarla en Google Calendar.
-4. Nunca inventes disponibilidad si la herramienta indica que no hay espacio.`
-  );
+  const [prompt, setPrompt] = useState("");
 
   // Playground chat state
-  const [chatMessages, setChatMessages] = useState([
-    { role: "assistant", content: "¡Hola! Soy Sofía de Clínica Zolution. ¿En qué puedo ayudarte hoy?" },
-  ]);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: string; content: string }>>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
 
-  // Load configuration from backend if available
+  // Load configuration from backend if available, or fall back to tenant dynamic config
   const loadAgentConfig = async () => {
+    const ctx = getTenantContext();
+    setTenant(ctx);
+
+    const initialPrompt = ctx.prompt || generateDefaultPrompt(ctx.name, ctx.industry);
+    setPrompt(initialPrompt);
+
+    setChatMessages([
+      {
+        role: "assistant",
+        content: `¡Hola! Soy el asistente virtual de ${ctx.name}. ¿En qué podemos ayudarte hoy?`,
+      },
+    ]);
+
     try {
       const data = await apiFetch<{
         system_prompt_generated?: string | null;
@@ -64,7 +70,9 @@ Instrucciones:
       }>("/agents/me");
 
       if (data) {
-        if (data.system_prompt_generated) setPrompt(data.system_prompt_generated);
+        if (data.system_prompt_generated && !ctx.prompt) {
+          setPrompt(data.system_prompt_generated);
+        }
         if (data.llm_provider) setProvider(data.llm_provider);
         if (data.llm_model) setModel(data.llm_model);
         if (data.status) setIsActive(data.status === "active");
@@ -77,10 +85,15 @@ Instrucciones:
 
   useEffect(() => {
     loadAgentConfig();
+    window.addEventListener("storage", loadAgentConfig);
+    return () => window.removeEventListener("storage", loadAgentConfig);
   }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
+    // Persist locally for immediate universal multi-tenant consistency
+    localStorage.setItem("zolution_agent_prompt", prompt);
+
     try {
       if (isLiveApi) {
         await apiFetch("/agents/me/llm-provider", {
@@ -100,6 +113,12 @@ Instrucciones:
     }
   };
 
+  const handleResetToDefault = () => {
+    const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry);
+    setPrompt(freshPrompt);
+    localStorage.setItem("zolution_agent_prompt", freshPrompt);
+  };
+
   const handleSendMessage = () => {
     if (!inputMessage.trim()) return;
     const userMsg = inputMessage;
@@ -108,18 +127,21 @@ Instrucciones:
     setChatMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setIsSimulating(true);
 
-    // Simulate agent response with tool calling simulation
+    // Simulate agent response with tool calling simulation tailored to company
     setTimeout(() => {
-      let reply = "Entendido, con gusto te ayudo.";
-      if (userMsg.toLowerCase().includes("cita") || userMsg.toLowerCase().includes("hora")) {
-        reply = "Claro, permíteme consultar la agenda... Para este jueves tengo disponibilidad a las 10:00 AM y a las 3:30 PM. ¿Cuál de esos horarios te queda mejor?";
-      } else if (userMsg.toLowerCase().includes("10") || userMsg.toLowerCase().includes("3")) {
-        reply = "¡Excelente! He agendado tu cita en Google Calendar y te llegará un recordatorio por WhatsApp un día antes. ¿Deseas consultar algo más?";
+      let reply = `Entendido, en ${tenant.name} con gusto te ayudamos.`;
+      const lower = userMsg.toLowerCase();
+      if (lower.includes("cita") || lower.includes("hora") || lower.includes("reunión") || lower.includes("agendar") || lower.includes("disponib")) {
+        reply = `Claro, permíteme consultar la agenda disponible en Google Calendar... Para este jueves tenemos espacio a las 10:00 AM y a las 3:30 PM. ¿Cuál horario te queda mejor?`;
+      } else if (lower.includes("10") || lower.includes("3") || lower.includes("jueves") || lower.includes("perfecto") || lower.includes("sí")) {
+        reply = `¡Excelente! He agendado formalmente tu cita en el calendario de ${tenant.name}. Te llegará un recordatorio por WhatsApp un día antes. ¿Deseas consultar algo más?`;
+      } else if (lower.includes("costo") || lower.includes("precio") || lower.includes("tarifa") || lower.includes("servicio")) {
+        reply = `En ${tenant.name} manejamos planes adaptados a tus requerimientos. Con mucho gusto podemos agendar una sesión inicial de diagnóstico sin costo para evaluar tu caso. ¿Te gustaría apartar un horario?`;
       }
 
       setChatMessages((prev) => [...prev, { role: "assistant", content: reply }]);
       setIsSimulating(false);
-    }, 1200);
+    }, 1100);
   };
 
   return (
@@ -129,10 +151,10 @@ Instrucciones:
         <div>
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Bot className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            Configuración del Agente IA
+            Configuración del Agente IA · {tenant.name}
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Personaliza la personalidad, instrucciones del sistema y modelos de lenguaje de tu clínica.
+            Personaliza la personalidad, instrucciones del sistema y modelos de lenguaje de {tenant.name}.
           </p>
         </div>
 
@@ -198,7 +220,7 @@ Instrucciones:
                 <div>
                   <CardTitle className="text-base font-semibold">Prompt del Sistema (System Instructions)</CardTitle>
                   <CardDescription className="text-xs">
-                    Define cómo debe saludar, qué información pedir y las políticas del consultorio.
+                    Define cómo debe saludar, qué información pedir y las políticas de atención de {tenant.name}.
                   </CardDescription>
                 </div>
                 <Badge variant="outline" className="text-xs font-mono text-indigo-600 dark:text-indigo-400">
@@ -208,26 +230,22 @@ Instrucciones:
             </CardHeader>
             <CardContent className="space-y-3">
               <Textarea
-                rows={12}
+                rows={13}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 className="font-mono text-xs sm:text-sm leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 resize-y border-zinc-200 dark:border-zinc-800"
                 placeholder="Escribe las instrucciones para el asistente..."
               />
               <div className="flex items-center justify-between text-xs text-zinc-500">
-                <span>Variables disponibles: &#123;&#123;nombre_cliente&#125;&#125;, &#123;&#123;telefono&#125;&#125;</span>
+                <span>Variables: &#123;&#123;nombre_cliente&#125;&#125;, &#123;&#123;telefono&#125;&#125;</span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() =>
-                    setPrompt(
-                      "Eres Sofía, asistente virtual de Zolution. Ayudas a pacientes a resolver dudas y agendar citas en Google Calendar."
-                    )
-                  }
+                  onClick={handleResetToDefault}
                   className="text-xs h-7 text-zinc-400 hover:text-zinc-600"
                 >
                   <RotateCcw className="mr-1 h-3 w-3" />
-                  Restaurar base
+                  Restaurar para {tenant.name}
                 </Button>
               </div>
             </CardContent>
@@ -283,7 +301,7 @@ Instrucciones:
                   <span className="font-medium text-zinc-700 dark:text-zinc-300">
                     Creatividad / Temperatura: {temperature}
                   </span>
-                  <span className="text-zinc-400">Recomendado: 0.2 - 0.4 para citas médicas</span>
+                  <span className="text-zinc-400">Recomendado: 0.2 - 0.4 para citas y atención</span>
                 </div>
                 <input
                   type="range"
@@ -324,10 +342,10 @@ Instrucciones:
                 <div>
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-indigo-500" />
-                    Simulador en Vivo
+                    Simulador en Vivo · WhatsApp
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Prueba cómo responde tu agente en tiempo real antes de desplegarlo.
+                    Prueba cómo responde el agente de {tenant.name} en tiempo real.
                   </CardDescription>
                 </div>
                 <Badge variant="secondary" className="text-[10px] bg-zinc-100 dark:bg-zinc-800">
@@ -369,7 +387,7 @@ Instrucciones:
                 {isSimulating && (
                   <div className="flex items-center gap-2 text-xs text-zinc-400 p-2 italic">
                     <Sparkles className="h-3.5 w-3.5 animate-spin text-indigo-500" />
-                    Sofía está consultando disponibilidad...
+                    El agente está consultando disponibilidad...
                   </div>
                 )}
               </div>
@@ -385,7 +403,7 @@ Instrucciones:
                 <Input
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder="Escribe como si fueras un paciente..."
+                  placeholder="Escribe como si fueras un cliente..."
                   className="text-xs sm:text-sm h-10"
                 />
                 <Button type="submit" size="icon" className="h-10 w-10 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white">

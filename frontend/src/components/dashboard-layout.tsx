@@ -38,6 +38,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [orgName, setOrgName] = useState<string>("Mi Empresa");
+  const [orgIndustry, setOrgIndustry] = useState<string>("Organización Activa");
 
   useEffect(() => {
     // Check initial system or local theme
@@ -47,6 +49,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       document.documentElement.classList.add("dark");
       setIsDarkMode(true);
     }
+
+    const loadTenant = () => {
+      const savedName = localStorage.getItem("zolution_org_name");
+      const savedIndustry = localStorage.getItem("zolution_org_industry");
+      if (savedName) setOrgName(savedName);
+      if (savedIndustry) setOrgIndustry(savedIndustry);
+    };
+
+    loadTenant();
+    window.addEventListener("storage", loadTenant);
+    return () => window.removeEventListener("storage", loadTenant);
   }, []);
 
   const toggleTheme = () => {
@@ -122,14 +135,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <div className="truncate text-left">
                 <p className="text-xs font-semibold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                  {typeof window !== "undefined"
-                    ? localStorage.getItem("zolution_org_name") || "Dental Care Clinic"
-                    : "Dental Care Clinic"}
+                  {orgName}
                 </p>
                 <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
-                  {typeof window !== "undefined"
-                    ? localStorage.getItem("zolution_org_industry") || "Organización Activa"
-                    : "Organización Activa"}
+                  {orgIndustry}
                 </p>
               </div>
             </div>

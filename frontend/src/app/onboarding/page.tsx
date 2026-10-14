@@ -34,10 +34,33 @@ export default function OnboardingPage() {
     "1. Asesoría inicial y diagnóstico\n2. Servicio estándar de atención\n3. Consultoría avanzada personalizada"
   );
   const [schedule, setSchedule] = useState("Lunes a Viernes: 8:00 AM - 6:00 PM\nSábados: 9:00 AM - 1:00 PM");
-  const [agentName, setAgentName] = useState("Sofía");
+  const [agentName, setAgentName] = useState("Asistente Virtual");
   const [tone, setTone] = useState("Profesional, cálido y resolutivo");
   const [cancellationPolicy, setCancellationPolicy] = useState("Cancelar con mínimo 2 horas de anticipación");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
+
+  React.useEffect(() => {
+    const savedName = localStorage.getItem("zolution_org_name");
+    const savedIndustry = localStorage.getItem("zolution_org_industry");
+    if (savedName) setCompanyName(savedName);
+    if (savedIndustry) {
+      setIndustry(savedIndustry);
+      const lower = savedIndustry.toLowerCase();
+      if (lower.includes("legal") || lower.includes("jurídic")) {
+        setAgentName("Martín");
+        setServices("1. Revisión y redacción de contratos\n2. Diagnóstico de litigio corporativo\n3. Asesoría laboral y societaria");
+      } else if (lower.includes("tech") || lower.includes("cloud") || lower.includes("sistemas")) {
+        setAgentName("Alex");
+        setServices("1. Discovery Call de arquitectura cloud\n2. Auditoría DevSecOps y Kubernetes\n3. Consultoría e implementación SaaS");
+      } else if (lower.includes("spa") || lower.includes("bienestar") || lower.includes("belleza")) {
+        setAgentName("Camila");
+        setServices("1. Masaje relajante y descontracturante\n2. Circuito de hidroterapia termal\n3. Tratamiento facial rejuvenecedor");
+      } else if (lower.includes("dental") || lower.includes("salud")) {
+        setAgentName("Sofía");
+        setServices("1. Consulta Odontológica General\n2. Limpieza Dental con Ultrasonido\n3. Valoración de Ortodoncia");
+      }
+    }
+  }, []);
 
   const handleGeneratePrompt = async () => {
     setIsGenerating(true);
@@ -89,7 +112,11 @@ Políticas y Reglas:
       localStorage.setItem("zolution_org_name", companyName);
       localStorage.setItem("zolution_org_industry", industry);
     }
-    router.push("/agent");
+    if (generatedPrompt) {
+      localStorage.setItem("zolution_agent_prompt", generatedPrompt);
+    }
+    window.dispatchEvent(new Event("storage"));
+    router.push("/");
   };
 
   return (

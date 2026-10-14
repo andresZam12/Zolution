@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Calendar,
   MessageSquare,
@@ -16,15 +16,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { getTenantContext, TenantContext } from "@/lib/tenant";
 
 export default function IntegrationsPage() {
+  const [tenant, setTenant] = useState<TenantContext>({
+    id: "org-1",
+    slug: "empresa",
+    name: "Cargando empresa...",
+    industry: "Servicios",
+    email: "contacto@empresa.com",
+  });
   const [googleConnected, setGoogleConnected] = useState(true);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://zolution-api.onrender.com/api/v1";
   const webhookUrl = `${apiBase}/webhooks/whatsapp`;
   const verifyToken = "zol_verify_sec_9941a";
+
+  useEffect(() => {
+    const ctx = getTenantContext();
+    setTenant(ctx);
+  }, []);
 
   const handleCopy = (text: string, type: "webhook" | "token") => {
     navigator.clipboard.writeText(text);
@@ -45,9 +58,9 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Integraciones y Conexiones</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Integraciones y Conexiones · {tenant.name}</h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Conecta tus herramientas para que el agente sincronice citas y reciba mensajes de WhatsApp.
+          Conecta tus herramientas para que el agente sincronice citas y reciba mensajes de WhatsApp para {tenant.name}.
         </p>
       </div>
 
@@ -62,7 +75,7 @@ export default function IntegrationsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base font-semibold">Google Calendar</CardTitle>
-                  <CardDescription className="text-xs">Sincronización bidireccional de citas médicas</CardDescription>
+                  <CardDescription className="text-xs">Sincronización bidireccional de citas y reuniones</CardDescription>
                 </div>
               </div>
               <Badge
@@ -79,17 +92,17 @@ export default function IntegrationsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Permite al agente consultar espacios libres (<code>check_availability</code>) y crear citas automáticamente (<code>book_appointment</code>) en la cuenta de Google de tu clínica usando OAuth 2.0.
+              Permite al agente consultar espacios libres (<code>check_availability</code>) y crear citas automáticamente (<code>book_appointment</code>) en la cuenta de Google de {tenant.name} usando OAuth 2.0.
             </p>
 
             <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-700/50 space-y-2 text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-zinc-500">Cuenta vinculada:</span>
-                <span className="font-medium text-zinc-800 dark:text-zinc-200">citas.dentalcare@gmail.com</span>
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">citas.{tenant.slug}@gmail.com</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-zinc-500">Calendario activo:</span>
-                <span className="font-medium text-zinc-800 dark:text-zinc-200">Agenda Principal (Consultorio 1)</span>
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">Calendario Oficial ({tenant.name})</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-zinc-500">Última sincronización:</span>
@@ -130,7 +143,7 @@ export default function IntegrationsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Configura estos valores en el panel de desarrolladores de <strong>Meta for Developers</strong> para conectar la línea de WhatsApp de tu clínica.
+              Configura estos valores en el panel de desarrolladores de <strong>Meta for Developers</strong> para conectar la línea de WhatsApp de <strong>{tenant.name}</strong>.
             </p>
 
             <div className="space-y-3">
@@ -197,7 +210,7 @@ export default function IntegrationsPage() {
                 Aislamiento Multi-Tenant de Credenciales
               </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
-                Tus tokens de Google Workspace y claves de WhatsApp están encriptados y protegidos a nivel de base de datos con políticas de seguridad por fila (RLS). Ninguna otra clínica puede acceder a tus credenciales.
+                Tus tokens de Google Workspace y claves de WhatsApp están encriptados y protegidos a nivel de base de datos con políticas de seguridad por fila (RLS). Ninguna otra empresa o tenant puede acceder a tus credenciales.
               </p>
             </div>
           </div>

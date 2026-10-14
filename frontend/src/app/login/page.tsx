@@ -22,34 +22,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
+import { apiFetch } from "@/lib/api";
+
 const demoTenants = [
   {
-    id: "org_4f1b892a-3199-4d2c",
-    name: "Dental Care Clinic",
+    id: "dra-garcia-dental",
+    name: "Clínica Dental & Estética Santa María",
     industry: "Salud y Cuidado Dental",
     icon: Stethoscope,
-    agent: "Sofía (Asistente Clínico)",
+    agent: "Sofía (Asistente Odontológica)",
   },
   {
-    id: "org_8e2a110b-9941-4e1a",
-    name: "Nova Legal & Asociados",
-    industry: "Servicios Legales y Asesoría",
+    id: "lex-asesores",
+    name: "Lex & Co. Asesoría Legal",
+    industry: "Servicios Legales y Jurídicos",
     icon: Briefcase,
-    agent: "Mateo (Asistente Legal)",
+    agent: "Martín (Asistente Legal)",
   },
   {
-    id: "org_117c491d-2283-4a8f",
-    name: "Luxe Studio & Spa",
-    industry: "Belleza, Cuidado y Bienestar",
-    icon: Scissors,
-    agent: "Valentina (Coordinadora de Citas)",
-  },
-  {
-    id: "org_993b772e-5501-4b7c",
-    name: "NexTech IT Solutions",
-    industry: "Soporte Técnico y Consultoría",
+    id: "nextech-cloud",
+    name: "NexTech Soluciones Cloud",
+    industry: "Tecnología, Cloud & Soporte TI",
     icon: Laptop,
-    agent: "Lucas (Agente de Soporte)",
+    agent: "Alex (Tech Lead)",
+  },
+  {
+    id: "luxe-spa",
+    name: "Luxe Wellness & Spa",
+    industry: "Bienestar, Spa & Belleza",
+    icon: Scissors,
+    agent: "Camila (Concierge de Bienestar)",
   },
 ];
 
@@ -64,28 +66,63 @@ export default function LoginPage() {
 
   const handleSelectDemoTenant = (tenant: typeof demoTenants[0]) => {
     localStorage.setItem("zolution_org_id", tenant.id);
+    localStorage.setItem("zolution_org_slug", tenant.id);
     localStorage.setItem("zolution_org_name", tenant.name);
     localStorage.setItem("zolution_org_industry", tenant.industry);
+    localStorage.removeItem("zolution_agent_prompt");
+
+    // Trigger storage event for layout re-render
+    window.dispatchEvent(new Event("storage"));
     router.push("/");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Save session locally
-    const orgId = isRegister ? `org_${Date.now()}` : "org_4f1b892a-3199-4d2c";
-    const orgName = isRegister ? companyName : "Dental Care Clinic";
+    try {
+      if (isRegister) {
+        let orgId = `org_${Date.now()}`;
+        let orgSlug = companyName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
 
-    localStorage.setItem("zolution_org_id", orgId);
-    localStorage.setItem("zolution_org_name", orgName);
-    localStorage.setItem("zolution_org_industry", industry);
+        try {
+          const resp = await apiFetch<{ id: string; slug: string; name: string }>("/organizations/register", {
+            method: "POST",
+            body: JSON.stringify({
+              name: companyName,
+              email: email,
+              industry: industry,
+            }),
+          });
+          if (resp && resp.id) {
+            orgId = resp.id;
+            orgSlug = resp.slug;
+          }
+        } catch {
+          // If backend offline or network error, fallback to local registration
+        }
 
-    setTimeout(() => {
+        localStorage.setItem("zolution_org_id", orgId);
+        localStorage.setItem("zolution_org_slug", orgSlug);
+        localStorage.setItem("zolution_org_name", companyName);
+        localStorage.setItem("zolution_org_industry", industry);
+        localStorage.setItem("zolution_user_email", email);
+        localStorage.removeItem("zolution_agent_prompt");
+
+        window.dispatchEvent(new Event("storage"));
+        router.push("/onboarding");
+      } else {
+        // Login existing
+        const activeName = localStorage.getItem("zolution_org_name") || "Mi Empresa";
+        localStorage.setItem("zolution_user_email", email);
+        window.dispatchEvent(new Event("storage"));
+        router.push("/");
+      }
+    } finally {
       setIsLoading(false);
-      router.push("/");
-    }, 800);
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
