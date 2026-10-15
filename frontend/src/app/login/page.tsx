@@ -8,12 +8,7 @@ import {
   Mail,
   ArrowRight,
   ShieldCheck,
-  Sparkles,
   CheckCircle2,
-  Briefcase,
-  Scissors,
-  Stethoscope,
-  Laptop,
   KeyRound,
   RotateCcw,
   AlertCircle,
@@ -24,37 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
-
-const demoTenants = [
-  {
-    id: "dra-garcia-dental",
-    name: "Clínica Dental & Estética Santa María",
-    industry: "Salud y Cuidado Dental",
-    icon: Stethoscope,
-    agent: "Sofía (Asistente Odontológica)",
-  },
-  {
-    id: "lex-asesores",
-    name: "Lex & Co. Asesoría Legal",
-    industry: "Servicios Legales y Jurídicos",
-    icon: Briefcase,
-    agent: "Martín (Asistente Legal)",
-  },
-  {
-    id: "nextech-cloud",
-    name: "NexTech Soluciones Cloud",
-    industry: "Tecnología, Cloud & Soporte TI",
-    icon: Laptop,
-    agent: "Alex (Tech Lead)",
-  },
-  {
-    id: "luxe-spa",
-    name: "Luxe Wellness & Spa",
-    industry: "Bienestar, Spa & Belleza",
-    icon: Scissors,
-    agent: "Camila (Concierge de Bienestar)",
-  },
-];
 
 function LoginContent() {
   const router = useRouter();
@@ -127,21 +91,21 @@ function LoginContent() {
         window.location.href = resp.auth_url;
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo iniciar el flujo de Google.";
-      setErrorMessage(message);
+      const rawMessage = err instanceof Error ? err.message : "Error al conectar con Google.";
+      if (
+        rawMessage.includes("GOOGLE_CLIENT_ID") ||
+        rawMessage.includes("client_id") ||
+        rawMessage.includes("OAuth") ||
+        rawMessage.includes("400")
+      ) {
+        setErrorMessage(
+          "El acceso directo con Google requiere registrar GOOGLE_CLIENT_ID en Render. Mientras lo configuras, puedes registrarte o ingresar usando tu correo con código de verificación."
+        );
+      } else {
+        setErrorMessage(rawMessage);
+      }
       setIsGoogleLoading(false);
     }
-  };
-
-  const handleSelectDemoTenant = (tenant: (typeof demoTenants)[0]) => {
-    localStorage.setItem("zolution_org_id", tenant.id);
-    localStorage.setItem("zolution_org_slug", tenant.id);
-    localStorage.setItem("zolution_org_name", tenant.name);
-    localStorage.setItem("zolution_org_industry", tenant.industry);
-    localStorage.removeItem("zolution_agent_prompt");
-
-    window.dispatchEvent(new Event("storage"));
-    router.push("/");
   };
 
   // Step 1: Request 6-digit OTP code to email
@@ -590,44 +554,6 @@ function LoginContent() {
             )}
           </CardContent>
         </Card>
-
-        {/* Quick Demo Tenant Switcher for Fast Evaluation */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs px-1">
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-              Acceso Rápido Demo (Diferentes Sectores)
-            </span>
-            <span className="text-[11px] text-zinc-400">PostgreSQL Multi-Tenant</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {demoTenants.map((tenant) => {
-              const Icon = tenant.icon;
-              return (
-                <button
-                  key={tenant.id}
-                  onClick={() => handleSelectDemoTenant(tenant)}
-                  className="w-full text-left p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-indigo-500/50 hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20 transition-all shadow-2xs group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:scale-105 transition-transform">
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                        {tenant.name}
-                      </p>
-                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
-                        {tenant.industry}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <div className="text-center text-xs text-zinc-400 flex items-center justify-center gap-1.5 pt-2">
           <ShieldCheck className="h-4 w-4 text-emerald-500" />

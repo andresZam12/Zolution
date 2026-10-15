@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Bot,
@@ -17,6 +17,7 @@ import {
   Moon,
   ChevronRight,
   ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,18 +37,34 @@ const navigation = [
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [orgName, setOrgName] = useState<string>("Mi Empresa");
   const [orgIndustry, setOrgIndustry] = useState<string>("Organización Activa");
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
 
   useEffect(() => {
     // Check initial system or local theme
-    const isDark = document.documentElement.classList.contains("dark") ||
+    const isDark =
+      document.documentElement.classList.contains("dark") ||
       window.matchMedia("(prefers-color-scheme: dark)").matches;
     if (isDark) {
       document.documentElement.classList.add("dark");
       setIsDarkMode(true);
+    }
+
+    // Auth Guard: If not on /login, check if user has active session
+    if (pathname !== "/login") {
+      const token =
+        localStorage.getItem("zolution_token") ||
+        localStorage.getItem("zolution_auth_token") ||
+        localStorage.getItem("zolution_org_id");
+
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
     }
 
     const loadTenant = () => {
@@ -58,9 +75,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     };
 
     loadTenant();
+    setIsAuthChecked(true);
     window.addEventListener("storage", loadTenant);
     return () => window.removeEventListener("storage", loadTenant);
-  }, []);
+  }, [pathname, router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("zolution_token");
+    localStorage.removeItem("zolution_auth_token");
+    localStorage.removeItem("zolution_org_id");
+    localStorage.removeItem("zolution_org_slug");
+    localStorage.removeItem("zolution_org_name");
+    localStorage.removeItem("zolution_org_industry");
+    localStorage.removeItem("zolution_user_email");
+    localStorage.removeItem("zolution_user_id");
+    localStorage.removeItem("zolution_agent_prompt");
+    window.dispatchEvent(new Event("storage"));
+    router.push("/login");
+  };
 
   const toggleTheme = () => {
     if (isDarkMode) {
@@ -71,6 +103,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       setIsDarkMode(true);
     }
   };
+
+  // If on login page, render full screen without dashboard sidebar or header
+  if (pathname === "/login") {
+    return <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950">{children}</main>;
+  }
+
+  // If waiting for auth check on protected pages, show a minimalist subtle loader
+  if (!isAuthChecked) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold animate-pulse shadow-md shadow-indigo-500/20">
+            Z
+          </div>
+          <span className="text-xs text-zinc-400 font-medium">Verificando sesión...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col md:flex-row transition-colors duration-200">
@@ -183,22 +234,33 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
 
         {/* Footer Area with Theme Toggle & Status */}
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
             <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
               RLS Secured
             </span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-            title="Toggle theme"
-          >
-            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              title="Alternar tema"
+            >
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              className="h-8 w-8 text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </aside>
 
