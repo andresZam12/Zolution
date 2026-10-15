@@ -31,7 +31,6 @@ function LoginContent() {
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("Servicios Profesionales");
   const [otpCode, setOtpCode] = useState("");
-  const [devCode, setDevCode] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -108,15 +107,15 @@ function LoginContent() {
     }
   };
 
-  // Step 1: Request 6-digit OTP code to email
-  const handleRequestOtp = async (e: React.FormEvent) => {
+  // Step 1: Request 6-digit OTP code to email (the code is only delivered by email)
+  const handleRequestOtp = async (e: React.FormEvent | React.MouseEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const resp = await apiFetch<{ status: string; message: string; dev_code?: string }>(
+      const resp = await apiFetch<{ status: string; message: string; email: string }>(
         "/auth/register-request",
         {
           method: "POST",
@@ -128,11 +127,9 @@ function LoginContent() {
         }
       );
 
-      if (resp.dev_code) {
-        setDevCode(resp.dev_code);
-        setOtpCode(resp.dev_code); // Pre-fill in development for fast testing
-      }
-      setSuccessMessage("¡Código de verificación enviado! Revisa tu bandeja de entrada.");
+      setEmail(resp.email);
+      setOtpCode("");
+      setSuccessMessage(resp.message);
       setRegStep(2);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error al enviar código de verificación.";
@@ -446,14 +443,6 @@ function LoginContent() {
             {/* FLOW B: Registration Step 2 (OTP Verification) */}
             {isRegister && regStep === 2 && (
               <form onSubmit={handleVerifyOtp} className="space-y-4 text-xs">
-                {devCode && (
-                  <div className="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[11px] text-indigo-900 dark:text-indigo-300 flex items-center justify-between">
-                    <span>Modo Pruebas / Sandbox:</span>
-                    <span className="font-mono font-bold text-sm bg-white dark:bg-zinc-900 px-2 py-0.5 rounded border border-indigo-300">
-                      {devCode}
-                    </span>
-                  </div>
-                )}
 
                 <div className="space-y-1.5 text-center">
                   <label className="font-semibold text-zinc-800 dark:text-zinc-200 block text-xs">
