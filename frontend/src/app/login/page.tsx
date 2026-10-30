@@ -30,6 +30,7 @@ function LoginContent() {
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("Servicios Profesionales");
+  const [customIndustry, setCustomIndustry] = useState("");
   const [otpCode, setOtpCode] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
@@ -107,6 +108,9 @@ function LoginContent() {
     }
   };
 
+  const effectiveIndustry =
+    industry === "Otro" ? (customIndustry.trim() || "Otro Sector") : industry;
+
   // Step 1: Request 6-digit OTP code to email (the code is only delivered by email)
   const handleRequestOtp = async (e: React.FormEvent | React.MouseEvent) => {
     e.preventDefault();
@@ -122,7 +126,7 @@ function LoginContent() {
           body: JSON.stringify({
             email,
             company_name: companyName,
-            industry,
+            industry: effectiveIndustry,
           }),
         }
       );
@@ -162,7 +166,7 @@ function LoginContent() {
           code: otpCode.trim(),
           company_name: companyName,
           password,
-          industry,
+          industry: effectiveIndustry,
         }),
       });
 
@@ -171,7 +175,7 @@ function LoginContent() {
       localStorage.setItem("zolution_org_id", resp.organization.id);
       localStorage.setItem("zolution_org_slug", resp.organization.slug);
       localStorage.setItem("zolution_org_name", resp.organization.name);
-      localStorage.setItem("zolution_org_industry", industry);
+      localStorage.setItem("zolution_org_industry", effectiveIndustry);
       localStorage.setItem("zolution_user_email", resp.user.email);
       localStorage.setItem("zolution_user_id", resp.user.id);
       localStorage.removeItem("zolution_agent_prompt");
@@ -292,7 +296,7 @@ function LoginContent() {
                 ? regStep === 1
                   ? "Automatiza la atención y el agendamiento de citas en tiempo real."
                   : `Ingresa el código de 6 dígitos enviado a ${email}.`
-                : "Inicia sesión con tu cuenta o utiliza el acceso unificado de Google."}
+                : "Inicia sesión con tu correo electrónico y contraseña."}
             </CardDescription>
           </CardHeader>
 
@@ -312,8 +316,8 @@ function LoginContent() {
               </div>
             )}
 
-            {/* Google Fast Authentication Button */}
-            {(!isRegister || regStep === 1) && (
+            {/* Google Fast Authentication Button (Solo para registrar empresa) */}
+            {isRegister && regStep === 1 && (
               <>
                 <Button
                   type="button"
@@ -340,9 +344,7 @@ function LoginContent() {
                       d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.59 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                     />
                   </svg>
-                  <span>
-                    {isRegister ? "Registrarse con Google" : "Continuar con Google"}
-                  </span>
+                  <span>Registrarse con Google</span>
                   <Badge variant="outline" className="text-[9px] py-0 px-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
                     Calendar Auto-Sync
                   </Badge>
@@ -391,7 +393,17 @@ function LoginContent() {
                     <option value="Bienestar, Spa & Belleza">Bienestar, Spa & Belleza</option>
                     <option value="Servicios Profesionales y Consultoría">Servicios Profesionales y Consultoría</option>
                     <option value="Comercio y Retail">Comercio y Retail</option>
+                    <option value="Otro">Otro (Especificar sector o gremio)</option>
                   </select>
+                  {industry === "Otro" && (
+                    <Input
+                      required
+                      value={customIndustry}
+                      onChange={(e) => setCustomIndustry(e.target.value)}
+                      placeholder="Escribe tu sector o gremio (ej. Restaurantes, Construcción...)"
+                      className="h-9 text-xs mt-1.5"
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-1">
