@@ -42,6 +42,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [orgName, setOrgName] = useState<string>("Mi Empresa");
   const [orgIndustry, setOrgIndustry] = useState<string>("Organización Activa");
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [userName, setUserName] = useState<string>("");
+  const [userPicture, setUserPicture] = useState<string>("");
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
   useEffect(() => {
@@ -70,8 +73,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const loadTenant = () => {
       const savedName = localStorage.getItem("zolution_org_name");
       const savedIndustry = localStorage.getItem("zolution_org_industry");
+      const savedEmail = localStorage.getItem("zolution_user_email");
+      const savedUserName = localStorage.getItem("zolution_user_name");
+      const savedPicture = localStorage.getItem("zolution_user_picture");
       if (savedName) setOrgName(savedName);
       if (savedIndustry) setOrgIndustry(savedIndustry);
+      if (savedEmail) setUserEmail(savedEmail);
+      if (savedUserName) setUserName(savedUserName);
+      if (savedPicture) setUserPicture(savedPicture);
     };
 
     loadTenant();
@@ -89,6 +98,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     localStorage.removeItem("zolution_org_industry");
     localStorage.removeItem("zolution_user_email");
     localStorage.removeItem("zolution_user_id");
+    localStorage.removeItem("zolution_user_name");
+    localStorage.removeItem("zolution_user_picture");
     localStorage.removeItem("zolution_agent_prompt");
     window.dispatchEvent(new Event("storage"));
     router.push("/login");
@@ -285,6 +296,31 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <Sparkles className="w-3.5 h-3.5" />
               LLM Tool Calling: Active
             </div>
+
+            {/* Top-Tier User Profile Pill */}
+            {(userEmail || userName) && (
+              <div className="flex items-center gap-2 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+                {userPicture ? (
+                  <img
+                    src={userPicture}
+                    alt={userName || userEmail}
+                    className="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover shadow-2xs"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center">
+                    {(userName || userEmail || "U").charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="hidden lg:flex flex-col text-left">
+                  <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 max-w-[130px] truncate leading-tight">
+                    {userName || userEmail.split("@")[0]}
+                  </span>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 max-w-[130px] truncate leading-tight">
+                    {userEmail}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </header>
 

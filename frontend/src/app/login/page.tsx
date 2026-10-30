@@ -38,10 +38,37 @@ function LoginContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Handle Google OAuth callback if code is present in URL
+  // Handle Google OAuth callback with Anti-CSRF verification and error handling (RFC 6749)
   useEffect(() => {
+    const error = searchParams.get("error");
+    if (error) {
+      if (error === "access_denied") {
+        setErrorMessage("Has cancelado el inicio de sesión con Google.");
+      } else {
+        setErrorMessage(`Error de autorización de Google: ${error}`);
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
     const code = searchParams.get("code");
     if (!code) return;
+
+    // Verify Anti-CSRF state token
+    const returnedState = searchParams.get("state");
+    const savedState = sessionStorage.getItem("zolution_oauth_state");
+    sessionStorage.removeItem("zolution_oauth_state");
+
+    if (savedState && returnedState && returnedState !== savedState) {
+      setErrorMessage(
+        "Error de seguridad: La firma de estado de Google no coincide (protección anti-CSRF). Intenta de nuevo."
+      );
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    // Clean URL parameters immediately for privacy
+    window.history.replaceState({}, document.title, window.location.pathname);
 
     const handleGoogleCallback = async () => {
       setIsGoogleLoading(true);
@@ -50,7 +77,7 @@ function LoginContent() {
         const redirect_uri = window.location.origin + "/login";
         const resp = await apiFetch<{
           access_token: string;
-          user: { id: string; email: string; role: string };
+          user: { id: string; email: string; role: string; name?: string; picture?: string };
           organization: { id: string; name: string; slug: string; industry?: string };
           is_new_user?: boolean;
         }>("/auth/google/callback", {
@@ -69,6 +96,12 @@ function LoginContent() {
         );
         localStorage.setItem("zolution_user_email", resp.user.email);
         localStorage.setItem("zolution_user_id", resp.user.id);
+        if (resp.user.name) {
+          localStorage.setItem("zolution_user_name", resp.user.name);
+        }
+        if (resp.user.picture) {
+          localStorage.setItem("zolution_user_picture", resp.user.picture);
+        }
         localStorage.removeItem("zolution_agent_prompt");
 
         window.dispatchEvent(new Event("storage"));
@@ -93,8 +126,15 @@ function LoginContent() {
     setErrorMessage(null);
     try {
       const redirectUri = window.location.origin + "/login";
+      // Generate cryptographically random state token for Anti-CSRF protection (RFC 6749)
+      const state =
+        (typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID().replace(/-/g, "")
+          : Math.random().toString(36).substring(2)) + Date.now().toString(36);
+      sessionStorage.setItem("zolution_oauth_state", state);
+
       const resp = await apiFetch<{ auth_url: string }>(
-        `/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`
+        `/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
       );
       if (resp && resp.auth_url) {
         window.location.href = resp.auth_url;
