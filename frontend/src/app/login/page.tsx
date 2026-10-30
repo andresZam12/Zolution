@@ -47,13 +47,14 @@ function LoginContent() {
       setIsGoogleLoading(true);
       setErrorMessage(null);
       try {
+        const redirect_uri = window.location.origin + "/login";
         const resp = await apiFetch<{
           access_token: string;
           user: { id: string; email: string; role: string };
           organization: { id: string; name: string; slug: string; industry?: string };
         }>("/auth/google/callback", {
           method: "POST",
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, redirect_uri }),
         });
 
         localStorage.setItem("zolution_token", resp.access_token);
@@ -86,7 +87,10 @@ function LoginContent() {
     setIsGoogleLoading(true);
     setErrorMessage(null);
     try {
-      const resp = await apiFetch<{ auth_url: string }>("/auth/google/url");
+      const redirectUri = window.location.origin + "/login";
+      const resp = await apiFetch<{ auth_url: string }>(
+        `/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`
+      );
       if (resp && resp.auth_url) {
         window.location.href = resp.auth_url;
       }
@@ -94,12 +98,10 @@ function LoginContent() {
       const rawMessage = err instanceof Error ? err.message : "Error al conectar con Google.";
       if (
         rawMessage.includes("GOOGLE_CLIENT_ID") ||
-        rawMessage.includes("client_id") ||
-        rawMessage.includes("OAuth") ||
-        rawMessage.includes("400")
+        rawMessage.includes("Google OAuth no está configurado")
       ) {
         setErrorMessage(
-          "El acceso directo con Google requiere registrar GOOGLE_CLIENT_ID en Render. Mientras lo configuras, puedes registrarte o ingresar usando tu correo con código de verificación."
+          "El acceso directo con Google requiere registrar GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en Render. Mientras lo configuras, puedes registrarte o ingresar usando tu correo con código de verificación."
         );
       } else {
         setErrorMessage(rawMessage);
