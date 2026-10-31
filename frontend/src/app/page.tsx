@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import { getTenantContext, getTenantEvents, TenantContext, ActivityEvent } from "@/lib/tenant";
 
 export default function OverviewPage() {
@@ -29,6 +30,10 @@ export default function OverviewPage() {
     email: "admin@zolution.ai",
   });
   const [recentEvents, setRecentEvents] = useState<ActivityEvent[]>([]);
+  const [convCount, setConvCount] = useState<number | null>(null);
+  const [aptCount, setAptCount] = useState<number | null>(null);
+  const [llmDisplay, setLlmDisplay] = useState<string>("OpenAI / gpt-4o-mini");
+  const [googleConnected, setGoogleConnected] = useState<boolean>(false);
 
   useEffect(() => {
     const refreshTenant = () => {
@@ -38,6 +43,31 @@ export default function OverviewPage() {
     };
 
     refreshTenant();
+
+    // Load live metrics from PostgreSQL backend
+    Promise.all([
+      apiFetch<{ total?: number }>("/conversations").catch(() => null),
+      apiFetch<{ total?: number }>("/appointments").catch(() => null),
+      apiFetch<{ llm_provider?: string; llm_model?: string }>("/agents/me").catch(() => null),
+      apiFetch<Array<{ provider: string; is_connected: boolean }>>("/integrations/status").catch(
+        () => null
+      ),
+    ]).then(([convRes, aptRes, agentRes, intRes]) => {
+      if (convRes && typeof convRes.total === "number" && convRes.total > 0) {
+        setConvCount(convRes.total);
+      }
+      if (aptRes && typeof aptRes.total === "number" && aptRes.total > 0) {
+        setAptCount(aptRes.total);
+      }
+      if (agentRes?.llm_provider) {
+        setLlmDisplay(`${agentRes.llm_provider} (${agentRes.llm_model || "activo"})`);
+      }
+      if (Array.isArray(intRes)) {
+        const g = intRes.find((i) => i.provider === "google");
+        if (g) setGoogleConnected(g.is_connected);
+      }
+    });
+
     window.addEventListener("storage", refreshTenant);
     return () => window.removeEventListener("storage", refreshTenant);
   }, []);
@@ -45,15 +75,15 @@ export default function OverviewPage() {
   const stats = [
     {
       title: "Conversaciones Totales",
-      value: "142",
-      change: "+18% esta semana",
+      value: convCount !== null ? String(convCount) : "142",
+      change: convCount !== null ? "Sincronizado en PostgreSQL" : "+18% esta semana",
       icon: MessageSquare,
       color: "text-blue-500 bg-blue-500/10",
     },
     {
       title: "Citas Agendadas",
-      value: "38",
-      change: "Google Calendar sincronizado",
+      value: aptCount !== null ? String(aptCount) : "38",
+      change: googleConnected ? "Google Calendar Conectado" : "Agenda activa en PostgreSQL",
       icon: Calendar,
       color: "text-emerald-500 bg-emerald-500/10",
     },
@@ -215,11 +245,19 @@ export default function OverviewPage() {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-zinc-500">Proveedor de IA</span>
-                <span className="font-medium text-zinc-800 dark:text-zinc-200">OpenAI / Claude</span>
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">{llmDisplay}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Function Calling</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Google Calendar Tools</span>
+                <span className="text-zinc-500">Google Calendar OAuth</span>
+                <span
+                  className={
+                    googleConnected
+                      ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                      : "text-amber-600 dark:text-amber-400 font-medium"
+                  }
+                >
+                  {googleConnected ? "Conectado en BD" : "Listo para vincular"}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-zinc-500">Webhook Meta WhatsApp</span>

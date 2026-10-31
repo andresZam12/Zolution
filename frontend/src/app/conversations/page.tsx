@@ -64,8 +64,30 @@ export default function ConversationsPage() {
           messages: [],
         }));
         setConversations(mapped);
-        setSelectedConv(mapped[0]);
         setIsLiveApi(true);
+
+        // Fetch full messages of the first conversation immediately
+        try {
+          const firstDetail = await apiFetch<{
+            messages: Array<{
+              id: string;
+              role: "user" | "assistant";
+              content: string;
+              created_at: string;
+            }>;
+          }>(`/conversations/${mapped[0].id}`);
+          if (firstDetail && firstDetail.messages) {
+            mapped[0].messages = firstDetail.messages.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            }));
+          }
+        } catch {
+          // Keep empty if detail fails
+        }
+        setSelectedConv({ ...mapped[0] });
       } else {
         // Use tenant-specific dynamic demo conversation
         setConversations(initialDemos);

@@ -4,17 +4,15 @@ import React, { useState, useEffect } from "react";
 import {
   Calendar,
   Clock,
-  User,
   Phone,
   CheckCircle2,
   CalendarCheck,
   Plus,
   ExternalLink,
-  Filter,
-  Search,
   Sparkles,
   RefreshCw,
   X,
+  Database,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +20,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
 import { getTenantContext, getTenantAppointments, AppointmentItem, TenantContext } from "@/lib/tenant";
+
+interface ExtendedAppointmentItem extends AppointmentItem {
+  htmlLink?: string | null;
+}
 
 export default function AppointmentsPage() {
   const [tenant, setTenant] = useState<TenantContext>({
@@ -31,10 +33,12 @@ export default function AppointmentsPage() {
     industry: "Servicios",
     email: "admin@zolution.ai",
   });
-  const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [appointments, setAppointments] = useState<ExtendedAppointmentItem[]>([]);
+  const [isFromDb, setIsFromDb] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "confirmed" | "completed">("all");
   const [modalOpen, setModalOpen] = useState(false);
-  const [checkDate, setCheckDate] = useState("2026-10-15");
+  const [checkDate, setCheckDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [availabilityResult, setAvailabilityResult] = useState<string | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,22 +46,42 @@ export default function AppointmentsPage() {
   // Form state
   const [patientName, setPatientName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
-  const [appointmentDate, setAppointmentDate] = useState("2026-10-15");
+  const [appointmentDate, setAppointmentDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [appointmentTime, setAppointmentTime] = useState("10:00");
   const [serviceName, setServiceName] = useState("Reunión de Consulta");
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    const refreshData = () => {
-      const ctx = getTenantContext();
-      setTenant(ctx);
-      setAppointments(getTenantAppointments(ctx.name, ctx.industry));
-      setServiceName(`Consulta de Servicios con ${ctx.name}`);
-    };
+  const loadAppointments = async () => {
+    setIsLoading(true);
+    const ctx = getTenantContext();
+    setTenant(ctx);
+    setServiceName(`Consulta de Servicios con ${ctx.name}`);
 
-    refreshData();
-    window.addEventListener("storage", refreshData);
-    return () => window.removeEventListener("storage", refreshData);
+    try {
+      const res = await apiFetch<{
+        items: ExtendedAppointmentItem[];
+        total: number;
+      }>("/appointments");
+
+      if (res && Array.isArray(res.items) && res.items.length > 0) {
+        setAppointments(res.items);
+        setIsFromDb(true);
+      } else {
+        setAppointments(getTenantAppointments(ctx.name, ctx.industry));
+        setIsFromDb(false);
+      }
+    } catch {
+      setAppointments(getTenantAppointments(ctx.name, ctx.industry));
+      setIsFromDb(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAppointments();
+    window.addEventListener("storage", loadAppointments);
+    return () => window.removeEventListener("storage", loadAppointments);
   }, []);
 
   const handleCheckAvailability = async () => {
@@ -69,7 +93,9 @@ export default function AppointmentsPage() {
       );
       setAvailabilityResult(res.availability);
     } catch {
-      setAvailabilityResult(`Google Calendar: Agenda disponible para la fecha consultada en ${tenant.name} (3 cupos libres).`);
+      setAvailabilityResult(
+        `Agenda disponible para la fecha consultada (${checkDate}) en ${tenant.name}.`
+      );
     } finally {
       setIsCheckingAvailability(false);
     }
@@ -82,51 +108,84 @@ export default function AppointmentsPage() {
     setIsSubmitting(true);
     setFeedbackMsg(null);
 
-    const startTime = `${appointmentDate}T${appointmentTime}:00Z`;
-    const endTime = `${appointmentDate}T${appointmentTime}:45Z`;
+    const startTime = `${appointmentDate}T${appointmentTime}:00-05:00`;
+    const [hh, mm] = appointmentTime.split(":").map(Number);
+    const endDateObj = new Date(2026, 0, 1, hh || 10, (mm || 0) + 45);
+    const endHH = String(endDateObj.getHours()).padStart(2, "0");
+    const endMM = String(endDateObj.getMinutes()).padStart(2, "0");
+    const endTime = `${appointmentDate}T${endHH}:${endMM}:00-05:00`;
 
     try {
-      await apiFetch("/appointments", {
+      const res = await apiFetch<{
+        status: string;
+        message: string;
+        synced_with_google?: boolean;
+        appointment?: ExtendedAppointmentItem;
+      }>("/appointments", {
         method: "POST",
         body: JSON.stringify({
           customer_name: patientName,
           customer_phone: patientPhone,
           start_time: startTime,
           end_time: endTime,
+          service: serviceName,
+          date_label: appointmentDate,
+          time_label: `${appointmentTime} - ${endHH}:${endMM}`,
+          notes: serviceName,
         }),
       });
 
       setFeedbackMsg({
         type: "success",
-        text: `¡Cita creada y sincronizada con Google Calendar de ${tenant.name} exitosamente!`,
+        text: res.message || `¡Cita guardada en PostgreSQL para ${tenant.name}!`,
       });
+
+      if (res.appointment) {
+        setAppointments((prev) => (isFromDb ? [res.appointment!, ...prev] : [res.appointment!]));
+        setIsFromDb(true);
+      }
     } catch {
+      const fallbackApt: ExtendedAppointmentItem = {
+        id: `apt-${Date.now()}`,
+        patientName,
+        phone: patientPhone,
+        service: serviceName,
+        date: appointmentDate,
+        time: `${appointmentTime} (45 min)`,
+        status: "confirmed",
+        googleEventId: `local_evt_${Math.random().toString(36).substring(2, 8)}`,
+      };
+      setAppointments((prev) => [fallbackApt, ...prev]);
       setFeedbackMsg({
         type: "success",
-        text: `Cita registrada en el calendario oficial de ${tenant.name}.`,
+        text: `Cita registrada en el calendario de ${tenant.name}.`,
       });
+    } finally {
+      setIsSubmitting(false);
+      setTimeout(() => {
+        setModalOpen(false);
+        setFeedbackMsg(null);
+        setPatientName("");
+        setPatientPhone("");
+      }, 1500);
     }
+  };
 
-    const newApt: AppointmentItem = {
-      id: `apt-${Date.now()}`,
-      patientName,
-      phone: patientPhone,
-      service: serviceName,
-      date: appointmentDate,
-      time: `${appointmentTime} - 45 min`,
-      status: "confirmed",
-      googleEventId: `gc_evt_${Math.random().toString(36).substring(2, 9)}`,
-    };
-
-    setAppointments((prev) => [newApt, ...prev]);
-    setIsSubmitting(false);
-
-    setTimeout(() => {
-      setModalOpen(false);
-      setFeedbackMsg(null);
-      setPatientName("");
-      setPatientPhone("");
-    }, 1800);
+  const handleToggleComplete = async (apt: ExtendedAppointmentItem) => {
+    const nextStatus = apt.status === "confirmed" ? "completed" : "confirmed";
+    setAppointments((prev) =>
+      prev.map((item) => (item.id === apt.id ? { ...item, status: nextStatus } : item))
+    );
+    if (isFromDb) {
+      try {
+        await apiFetch(`/appointments/${apt.id}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: nextStatus }),
+        });
+      } catch {
+        // Keep optimistic UI
+      }
+    }
   };
 
   const filteredAppointments = appointments.filter((apt) =>
@@ -142,11 +201,23 @@ export default function AppointmentsPage() {
             Citas Agendadas · {tenant.name}
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Citas reservadas de forma autónoma por el agente en Google Calendar para {tenant.name}.
+            Citas reservadas en PostgreSQL y sincronizadas con Google Calendar para {tenant.name}.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge
+            variant="outline"
+            className={`text-xs gap-1.5 py-1 ${
+              isFromDb
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+            }`}
+          >
+            <Database className="h-3 w-3" />
+            {isFromDb ? "PostgreSQL Activo" : "Vista Inicial (Crea una cita para persistir)"}
+          </Badge>
+
           <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-0.5 bg-zinc-100 dark:bg-zinc-900 text-xs">
             <button
               onClick={() => setFilter("all")}
@@ -190,10 +261,10 @@ export default function AppointmentsPage() {
             </div>
             <div>
               <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                Verificador de Disponibilidad Google Calendar
+                Verificador de Disponibilidad en Tiempo Real
               </p>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Llama a la herramienta interna <code>check_availability</code> vinculada al calendario de {tenant.name}.
+                Ejecuta <code>check_availability</code> sobre Google Calendar y la agenda de PostgreSQL de {tenant.name}.
               </p>
             </div>
           </div>
@@ -221,10 +292,10 @@ export default function AppointmentsPage() {
         </CardContent>
         {availabilityResult && (
           <div className="px-4 pb-3 pt-0">
-            <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-800 border border-indigo-200/60 dark:border-indigo-800/60 text-xs text-indigo-950 dark:text-indigo-200 flex items-center justify-between">
+            <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-800 border border-indigo-200/60 dark:border-indigo-800/60 text-xs text-indigo-950 dark:text-indigo-200 flex items-center justify-between gap-2">
               <span>{availabilityResult}</span>
-              <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700">
-                200 OK Google API
+              <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 shrink-0">
+                Verificado
               </Badge>
             </div>
           </div>
@@ -244,16 +315,22 @@ export default function AppointmentsPage() {
                     {apt.phone}
                   </CardDescription>
                 </div>
-                <Badge
-                  variant={apt.status === "confirmed" ? "default" : "secondary"}
-                  className={`text-[10px] uppercase font-bold tracking-wider ${
-                    apt.status === "confirmed"
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                      : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => handleToggleComplete(apt)}
+                  title="Clic para cambiar estado (Confirmada / Completada)"
                 >
-                  {apt.status === "confirmed" ? "Confirmada" : "Completada"}
-                </Badge>
+                  <Badge
+                    variant={apt.status === "confirmed" ? "default" : "secondary"}
+                    className={`text-[10px] uppercase font-bold tracking-wider cursor-pointer ${
+                      apt.status === "confirmed"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                        : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+                    }`}
+                  >
+                    {apt.status === "confirmed" ? "Confirmada" : "Completada"}
+                  </Badge>
+                </button>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 text-xs">
@@ -272,11 +349,23 @@ export default function AppointmentsPage() {
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
-                <span className="font-mono text-[10px]">{apt.googleEventId}</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Google Sync
-                </span>
+                <span className="font-mono text-[10px] truncate max-w-[140px]">{apt.googleEventId}</span>
+                {apt.htmlLink ? (
+                  <a
+                    href={apt.htmlLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium flex items-center gap-1"
+                  >
+                    <span>Abrir en Google Cal</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {isFromDb ? "PostgreSQL Sync" : "Google Sync"}
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -289,9 +378,9 @@ export default function AppointmentsPage() {
           <Card className="w-full max-w-md border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in-50 zoom-in-95">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
-                <CardTitle className="text-base font-semibold">Nueva Cita en Google Calendar</CardTitle>
+                <CardTitle className="text-base font-semibold">Nueva Cita Oficial</CardTitle>
                 <CardDescription className="text-xs">
-                  Aparta un cupo en el calendario oficial de {tenant.name}.
+                  Guarda en PostgreSQL y sincroniza con el calendario de {tenant.name}.
                 </CardDescription>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setModalOpen(false)} className="h-8 w-8">
@@ -372,8 +461,8 @@ export default function AppointmentsPage() {
                   <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="text-xs">
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
-                    {isSubmitting ? "Sincronizando..." : "Agendar en Google"}
+                  <Button type="submit" disabled={isSubmitting || isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
+                    {isSubmitting ? "Guardando en BD..." : "Agendar y Sincronizar"}
                   </Button>
                 </div>
               </CardContent>

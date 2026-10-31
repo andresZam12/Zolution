@@ -145,29 +145,67 @@ export default function AgentConfigPage() {
     localStorage.setItem("zolution_agent_prompt", freshPrompt);
   };
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isSimulating) return;
     const userMsg = inputMessage;
     setInputMessage("");
 
     setChatMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setIsSimulating(true);
 
-    // Simulate agent response with tool calling simulation tailored to company
-    setTimeout(() => {
+    try {
+      const simRes = await apiFetch<{
+        conversation_id: string;
+        reply: string;
+        tool_called?: string | null;
+        appointment_created?: boolean;
+      }>("/conversations/simulate", {
+        method: "POST",
+        body: JSON.stringify({
+          message: userMsg,
+          customer_name: "Cliente Simulador WhatsApp",
+          customer_phone: "+57 300 000 0000",
+          system_prompt_override: prompt,
+        }),
+      });
+
+      const toolPrefix = simRes.tool_called ? `[Tool: ${simRes.tool_called}] ` : "";
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `${toolPrefix}${simRes.reply}` },
+      ]);
+      setIsLiveApi(true);
+    } catch {
       let reply = `Entendido, en ${tenant.name} con gusto te ayudamos.`;
       const lower = userMsg.toLowerCase();
-      if (lower.includes("cita") || lower.includes("hora") || lower.includes("reunión") || lower.includes("agendar") || lower.includes("disponib")) {
-        reply = `Claro, permíteme consultar la agenda disponible en Google Calendar... Para este jueves tenemos espacio a las 10:00 AM y a las 3:30 PM. ¿Cuál horario te queda mejor?`;
-      } else if (lower.includes("10") || lower.includes("3") || lower.includes("jueves") || lower.includes("perfecto") || lower.includes("sí")) {
+      if (
+        lower.includes("cita") ||
+        lower.includes("hora") ||
+        lower.includes("reunión") ||
+        lower.includes("agendar") ||
+        lower.includes("disponib")
+      ) {
+        reply = `Claro, permíteme consultar la agenda disponible en Google Calendar... Para mañana tenemos espacio a las 10:00 AM y a las 3:30 PM. ¿Cuál horario te queda mejor?`;
+      } else if (
+        lower.includes("10") ||
+        lower.includes("3") ||
+        lower.includes("jueves") ||
+        lower.includes("perfecto") ||
+        lower.includes("sí")
+      ) {
         reply = `¡Excelente! He agendado formalmente tu cita en el calendario de ${tenant.name}. Te llegará un recordatorio por WhatsApp un día antes. ¿Deseas consultar algo más?`;
-      } else if (lower.includes("costo") || lower.includes("precio") || lower.includes("tarifa") || lower.includes("servicio")) {
-        reply = `En ${tenant.name} manejamos planes adaptados a tus requerimientos. Con mucho gusto podemos agendar una sesión inicial de diagnóstico sin costo para evaluar tu caso. ¿Te gustaría apartar un horario?`;
+      } else if (
+        lower.includes("costo") ||
+        lower.includes("precio") ||
+        lower.includes("tarifa") ||
+        lower.includes("servicio")
+      ) {
+        reply = `En ${tenant.name} manejamos planes adaptados a tus requerimientos. Con mucho gusto podemos agendar una sesión inicial de diagnóstico para evaluar tu caso. ¿Te gustaría apartar un horario?`;
       }
-
       setChatMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    } finally {
       setIsSimulating(false);
-    }, 1100);
+    }
   };
 
   return (
