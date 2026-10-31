@@ -40,8 +40,15 @@ function LoginContent() {
 
   // Handle Google OAuth callback with Anti-CSRF verification and error handling (RFC 6749)
   useEffect(() => {
+    const returnedState = searchParams.get("state") || "";
+    const isCalendarConnect = returnedState.startsWith("calendar_connect_");
+
     const error = searchParams.get("error");
     if (error) {
+      if (isCalendarConnect) {
+        router.replace(`/integrations?error=${encodeURIComponent(error)}`);
+        return;
+      }
       if (error === "access_denied") {
         setErrorMessage("Has cancelado el inicio de sesión con Google.");
       } else {
@@ -55,7 +62,6 @@ function LoginContent() {
     if (!code) return;
 
     // Verify Anti-CSRF state token
-    const returnedState = searchParams.get("state");
     const savedState = sessionStorage.getItem("zolution_oauth_state");
     sessionStorage.removeItem("zolution_oauth_state");
 
@@ -75,6 +81,18 @@ function LoginContent() {
       setErrorMessage(null);
       try {
         const redirect_uri = window.location.origin + "/login";
+
+        // Flow 1: Connecting Google Calendar from /integrations
+        if (isCalendarConnect) {
+          await apiFetch("/integrations/google/callback", {
+            method: "POST",
+            body: JSON.stringify({ code, redirect_uri }),
+          });
+          router.replace("/integrations?connected=google");
+          return;
+        }
+
+        // Flow 2: Standard Google Sign-In / Sign-Up
         const resp = await apiFetch<{
           access_token: string;
           user: { id: string; email: string; role: string; name?: string; picture?: string };
@@ -112,6 +130,10 @@ function LoginContent() {
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Error al conectar con Google.";
+        if (isCalendarConnect) {
+          router.replace(`/integrations?error=${encodeURIComponent(message)}`);
+          return;
+        }
         setErrorMessage(message);
       } finally {
         setIsGoogleLoading(false);
@@ -297,7 +319,7 @@ function LoginContent() {
           {isGoogleLoading && (
             <div className="bg-indigo-600 text-white text-xs py-2 px-4 text-center flex items-center justify-center gap-2">
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              <span>Conectando con Google y vinculando Google Calendar...</span>
+              <span>Conectando con Google y vinculando credenciales...</span>
             </div>
           )}
 
@@ -396,7 +418,7 @@ function LoginContent() {
                   </svg>
                   <span>Registrarse con Google</span>
                   <Badge variant="outline" className="text-[9px] py-0 px-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                    Calendar Auto-Sync
+                    Acceso Rápido
                   </Badge>
                 </Button>
 
@@ -505,7 +527,6 @@ function LoginContent() {
             {/* FLOW B: Registration Step 2 (OTP Verification) */}
             {isRegister && regStep === 2 && (
               <form onSubmit={handleVerifyOtp} className="space-y-4 text-xs">
-
                 <div className="space-y-1.5 text-center">
                   <label className="font-semibold text-zinc-800 dark:text-zinc-200 block text-xs">
                     Código de Seguridad (6 dígitos)
