@@ -204,7 +204,7 @@ function LoginContent() {
     try {
       const resp = await apiFetch<{
         access_token: string;
-        user: { id: string; email: string; role: string };
+        user: { id: string; email: string; role: string; name?: string; picture?: string };
         organization: { id: string; name: string; slug: string; industry?: string };
       }>("/auth/verify-code", {
         method: "POST",
@@ -225,6 +225,9 @@ function LoginContent() {
       localStorage.setItem("zolution_org_industry", effectiveIndustry);
       localStorage.setItem("zolution_user_email", resp.user.email);
       localStorage.setItem("zolution_user_id", resp.user.id);
+      if (resp.user.name) {
+        localStorage.setItem("zolution_user_name", resp.user.name);
+      }
       localStorage.removeItem("zolution_agent_prompt");
 
       window.dispatchEvent(new Event("storage"));
@@ -246,7 +249,7 @@ function LoginContent() {
     try {
       const resp = await apiFetch<{
         access_token: string;
-        user: { id: string; email: string; role: string };
+        user: { id: string; email: string; role: string; name?: string; picture?: string };
         organization: { id: string; name: string; slug: string; industry?: string };
       }>("/auth/login", {
         method: "POST",
