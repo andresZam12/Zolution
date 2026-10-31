@@ -4,15 +4,14 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
-  Clock,
   Sparkles,
   Bot,
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
   ListPlus,
-  Send,
   Zap,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,14 +20,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
 
+const PREDEFINED_INDUSTRIES = [
+  "Servicios Profesionales y Consultoría",
+  "Salud y Consultorios Médicos/Dentales",
+  "Servicios Legales y Jurídicos",
+  "Belleza, Spas y Cuidado Personal",
+  "Tecnología, Software y Soporte",
+  "Talleres y Mantenimiento",
+  "Comercio y Retail",
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingFinish, setIsSavingFinish] = useState(false);
 
   // Form State
   const [companyName, setCompanyName] = useState("");
-  const [industry, setIndustry] = useState("Servicios Profesionales");
+  const [industry, setIndustry] = useState("Servicios Profesionales y Consultoría");
+  const [customIndustry, setCustomIndustry] = useState("");
   const [whatsappPhone, setWhatsappPhone] = useState("+57 311 000 0000");
   const [services, setServices] = useState(
     "1. Asesoría inicial y diagnóstico\n2. Servicio estándar de atención\n3. Consultoría avanzada personalizada"
@@ -39,27 +50,85 @@ export default function OnboardingPage() {
   const [cancellationPolicy, setCancellationPolicy] = useState("Cancelar con mínimo 2 horas de anticipación");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
 
+  const effectiveIndustry = industry === "Otro" ? customIndustry.trim() || "Servicios Profesionales" : industry;
+
+  const applyIndustryDefaults = (ind: string) => {
+    const lower = ind.toLowerCase();
+    if (lower.includes("legal") || lower.includes("jurídic")) {
+      setAgentName("Martín");
+      setServices("1. Revisión y redacción de contratos\n2. Diagnóstico de litigio corporativo\n3. Asesoría laboral y societaria");
+    } else if (lower.includes("tech") || lower.includes("cloud") || lower.includes("sistemas") || lower.includes("software")) {
+      setAgentName("Alex");
+      setServices("1. Discovery Call de arquitectura cloud\n2. Auditoría DevSecOps y Kubernetes\n3. Consultoría e implementación SaaS");
+    } else if (lower.includes("spa") || lower.includes("bienestar") || lower.includes("belleza")) {
+      setAgentName("Camila");
+      setServices("1. Masaje relajante y descontracturante\n2. Circuito de hidroterapia termal\n3. Tratamiento facial rejuvenecedor");
+    } else if (lower.includes("dental") || lower.includes("salud") || lower.includes("médic")) {
+      setAgentName("Sofía");
+      setServices("1. Consulta Odontológica General\n2. Limpieza Dental con Ultrasonido\n3. Valoración de Ortodoncia");
+    }
+  };
+
   React.useEffect(() => {
     const savedName = localStorage.getItem("zolution_org_name");
     const savedIndustry = localStorage.getItem("zolution_org_industry");
     if (savedName) setCompanyName(savedName);
     if (savedIndustry) {
-      setIndustry(savedIndustry);
-      const lower = savedIndustry.toLowerCase();
-      if (lower.includes("legal") || lower.includes("jurídic")) {
-        setAgentName("Martín");
-        setServices("1. Revisión y redacción de contratos\n2. Diagnóstico de litigio corporativo\n3. Asesoría laboral y societaria");
-      } else if (lower.includes("tech") || lower.includes("cloud") || lower.includes("sistemas")) {
-        setAgentName("Alex");
-        setServices("1. Discovery Call de arquitectura cloud\n2. Auditoría DevSecOps y Kubernetes\n3. Consultoría e implementación SaaS");
-      } else if (lower.includes("spa") || lower.includes("bienestar") || lower.includes("belleza")) {
-        setAgentName("Camila");
-        setServices("1. Masaje relajante y descontracturante\n2. Circuito de hidroterapia termal\n3. Tratamiento facial rejuvenecedor");
-      } else if (lower.includes("dental") || lower.includes("salud")) {
-        setAgentName("Sofía");
-        setServices("1. Consulta Odontológica General\n2. Limpieza Dental con Ultrasonido\n3. Valoración de Ortodoncia");
+      if (PREDEFINED_INDUSTRIES.includes(savedIndustry)) {
+        setIndustry(savedIndustry);
+      } else {
+        setIndustry("Otro");
+        setCustomIndustry(savedIndustry);
       }
+      applyIndustryDefaults(savedIndustry);
     }
+
+    // Also load from PostgreSQL backend if authenticated
+    const fetchBackendData = async () => {
+      try {
+        const [orgData, agentData] = await Promise.all([
+          apiFetch<{ name?: string }>("/organizations/me").catch(() => null),
+          apiFetch<{
+            onboarding_answers?: Record<string, unknown> | null;
+            system_prompt_generated?: string | null;
+          }>("/agents/me").catch(() => null),
+        ]);
+
+        if (orgData?.name && !savedName) {
+          setCompanyName(orgData.name);
+        }
+
+        const ans = agentData?.onboarding_answers;
+        if (ans && typeof ans === "object") {
+          const dbName = (ans.companyName || ans.business_name) as string | undefined;
+          const dbInd = (ans.industry || ans.business_type) as string | undefined;
+          if (dbName) setCompanyName(dbName);
+          if (dbInd) {
+            if (PREDEFINED_INDUSTRIES.includes(dbInd)) {
+              setIndustry(dbInd);
+            } else {
+              setIndustry("Otro");
+              setCustomIndustry(dbInd);
+            }
+          }
+          if (typeof ans.whatsappPhone === "string" && ans.whatsappPhone) setWhatsappPhone(ans.whatsappPhone);
+          if (typeof ans.services === "string" && ans.services) setServices(ans.services);
+          if (typeof ans.schedule === "string" && ans.schedule) setSchedule(ans.schedule);
+          if (typeof ans.agentName === "string" && ans.agentName) setAgentName(ans.agentName);
+          if (typeof ans.tone === "string" && ans.tone) setTone(ans.tone);
+          if (typeof ans.cancellationPolicy === "string" && ans.cancellationPolicy) {
+            setCancellationPolicy(ans.cancellationPolicy);
+          }
+        }
+        if (agentData?.system_prompt_generated) {
+          setGeneratedPrompt(agentData.system_prompt_generated);
+        }
+      } catch {
+        // Keep local values
+      }
+    };
+
+    fetchBackendData();
   }, []);
 
   const handleGeneratePrompt = async () => {
@@ -68,7 +137,7 @@ export default function OnboardingPage() {
     const compiledPrompt = `Eres ${agentName}, la asistente virtual inteligente de ${companyName || "la empresa"}.
 Tu rol es atender a los clientes por WhatsApp, responder dudas sobre los servicios y agendar citas o reuniones en Google Calendar de forma autónoma.
 
-Sector: ${industry}
+Sector: ${effectiveIndustry}
 Tono y personalidad: ${tone}
 
 Catálogo de Servicios:
@@ -84,22 +153,27 @@ Políticas y Reglas:
 - Si el cliente tiene una duda fuera de alcance, sé honesta y ofrece comunicar con un asesor humano.`;
 
     try {
-      // Try backend endpoint if live
       await apiFetch("/agents/me/onboarding", {
         method: "PUT",
         body: JSON.stringify({
           answers: {
-            companyName,
-            industry,
+            companyName: companyName.trim(),
+            business_name: companyName.trim(),
+            industry: effectiveIndustry,
+            business_type: effectiveIndustry,
+            whatsappPhone,
             services,
             schedule,
             agentName,
+            agent_name: agentName,
             tone,
+            cancellationPolicy,
+            system_prompt_generated: compiledPrompt,
           },
         }),
       });
     } catch {
-      // Fallback local
+      // Fallback local if offline
     }
 
     setGeneratedPrompt(compiledPrompt);
@@ -107,16 +181,47 @@ Políticas y Reglas:
     setStep(4);
   };
 
-  const handleFinishOnboarding = () => {
-    if (companyName) {
-      localStorage.setItem("zolution_org_name", companyName);
-      localStorage.setItem("zolution_org_industry", industry);
+  const handleFinishOnboarding = async () => {
+    setIsSavingFinish(true);
+    const cleanName = companyName.trim();
+
+    if (cleanName) {
+      localStorage.setItem("zolution_org_name", cleanName);
+      localStorage.setItem("zolution_org_industry", effectiveIndustry);
     }
     if (generatedPrompt) {
       localStorage.setItem("zolution_agent_prompt", generatedPrompt);
     }
-    window.dispatchEvent(new Event("storage"));
-    router.push("/");
+
+    try {
+      await apiFetch("/agents/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          company_name: cleanName || undefined,
+          system_prompt_generated: generatedPrompt,
+          status: "active",
+          onboarding_answers: {
+            companyName: cleanName,
+            business_name: cleanName,
+            industry: effectiveIndustry,
+            business_type: effectiveIndustry,
+            whatsappPhone,
+            services,
+            schedule,
+            agentName,
+            agent_name: agentName,
+            tone,
+            cancellationPolicy,
+          },
+        }),
+      });
+    } catch {
+      // Keep local storage sync if offline
+    } finally {
+      setIsSavingFinish(false);
+      window.dispatchEvent(new Event("storage"));
+      router.push("/");
+    }
   };
 
   return (
@@ -131,7 +236,7 @@ Políticas y Reglas:
             Configura tu Agente Inteligente de WhatsApp
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-            Zolution ensambla el prompt del sistema y conecta las herramientas en minutos para tu empresa.
+            Zolution ensambla el prompt del sistema y guarda la configuración de tu empresa en PostgreSQL.
           </p>
 
           {/* Progress bar */}
@@ -176,18 +281,37 @@ Políticas y Reglas:
                   </label>
                   <select
                     value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
+                    onChange={(e) => {
+                      setIndustry(e.target.value);
+                      if (e.target.value !== "Otro") {
+                        applyIndustryDefaults(e.target.value);
+                      }
+                    }}
                     className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs"
                   >
-                    <option value="Servicios Profesionales y Consultoría">Servicios Profesionales y Consultoría</option>
-                    <option value="Salud y Consultorios Médicos/Dentales">Salud y Consultorios Médicos/Dentales</option>
-                    <option value="Servicios Legales y Jurídicos">Servicios Legales y Jurídicos</option>
-                    <option value="Belleza, Spas y Cuidado Personal">Belleza, Spas y Cuidado Personal</option>
-                    <option value="Tecnología, Software y Soporte">Tecnología, Software y Soporte</option>
-                    <option value="Talleres y Mantenimiento">Talleres y Mantenimiento</option>
-                    <option value="Comercio y Retail">Comercio y Retail</option>
+                    {PREDEFINED_INDUSTRIES.map((ind) => (
+                      <option key={ind} value={ind}>
+                        {ind}
+                      </option>
+                    ))}
+                    <option value="Otro">Otro (Especificar sector o gremio)</option>
                   </select>
                 </div>
+
+                {industry === "Otro" && (
+                  <div className="space-y-1 animate-in fade-in duration-200">
+                    <label className="font-medium text-indigo-600 dark:text-indigo-400">
+                      ¿Cuál es el sector o actividad de tu negocio?
+                    </label>
+                    <Input
+                      required
+                      value={customIndustry}
+                      onChange={(e) => setCustomIndustry(e.target.value)}
+                      placeholder="Ej. Veterinaria, Inmobiliaria, Academia de Idiomas, Restaurante..."
+                      className="h-9 text-xs border-indigo-300 dark:border-indigo-800"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
@@ -204,7 +328,7 @@ Políticas y Reglas:
                 <div className="pt-2 flex justify-end">
                   <Button
                     onClick={() => setStep(2)}
-                    disabled={!companyName}
+                    disabled={!companyName.trim() || (industry === "Otro" && !customIndustry.trim())}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
                   >
                     Siguiente: Servicios y Horarios
@@ -327,7 +451,7 @@ Políticas y Reglas:
                     className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
                   >
                     <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    {isGenerating ? "Generando con IA..." : "Sintetizar Prompt del Agente"}
+                    {isGenerating ? "Guardando y Generando..." : "Sintetizar Prompt del Agente"}
                   </Button>
                 </div>
               </CardContent>
@@ -344,7 +468,7 @@ Políticas y Reglas:
                     ¡Prompt del Agente Ensamblado Exitosamente!
                   </CardTitle>
                   <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs">
-                    Listo para WhatsApp
+                    Sincronizado en BD
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
@@ -376,10 +500,20 @@ Políticas y Reglas:
                   </Button>
                   <Button
                     onClick={handleFinishOnboarding}
+                    disabled={isSavingFinish}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
                   >
-                    Guardar y Abrir Simulador
-                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    {isSavingFinish ? (
+                      <>
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        Guardando en PostgreSQL...
+                      </>
+                    ) : (
+                      <>
+                        Guardar y Abrir Panel
+                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>

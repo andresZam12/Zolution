@@ -7,13 +7,14 @@ import {
   Shield,
   Save,
   CheckCircle2,
-  Clock,
-  Bell,
+  KeyRound,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { apiFetch } from "@/lib/api";
 import { getTenantContext, TenantContext } from "@/lib/tenant";
 
 export default function SettingsPage() {
@@ -29,7 +30,13 @@ export default function SettingsPage() {
   const [contactEmail, setContactEmail] = useState("");
   const [phone, setPhone] = useState("+57 310 987 6543");
   const [address, setAddress] = useState("Sede Central Empresarial");
+  const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Optional password update state (for Google OAuth users or password change)
+  const [newPassword, setNewPassword] = useState("");
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   useEffect(() => {
     const ctx = getTenantContext();
@@ -37,17 +44,115 @@ export default function SettingsPage() {
     setCompanyName(ctx.name);
     setIndustry(ctx.industry);
     setContactEmail(ctx.email);
+
+    const loadBackendSettings = async () => {
+      try {
+        const [orgData, agentData] = await Promise.all([
+          apiFetch<{ id?: string; name?: string; slug?: string }>("/organizations/me").catch(() => null),
+          apiFetch<{ onboarding_answers?: Record<string, unknown> | null }>("/agents/me").catch(() => null),
+        ]);
+
+        if (orgData) {
+          setTenant((prev) => ({
+            ...prev,
+            id: orgData.id || prev.id,
+            name: orgData.name || prev.name,
+            slug: orgData.slug || prev.slug,
+          }));
+          if (orgData.name) {
+            setCompanyName(orgData.name);
+            localStorage.setItem("zolution_org_name", orgData.name);
+          }
+          if (orgData.id) localStorage.setItem("zolution_org_id", orgData.id);
+          if (orgData.slug) localStorage.setItem("zolution_org_slug", orgData.slug);
+        }
+
+        const ans = agentData?.onboarding_answers;
+        if (ans && typeof ans === "object") {
+          const dbInd = (ans.industry || ans.business_type) as string | undefined;
+          if (dbInd) {
+            setIndustry(dbInd);
+            localStorage.setItem("zolution_org_industry", dbInd);
+            setTenant((prev) => ({ ...prev, industry: dbInd }));
+          }
+          const dbPhone = (ans.phone || ans.whatsappPhone) as string | undefined;
+          if (dbPhone) setPhone(dbPhone);
+          const dbAddr = ans.address as string | undefined;
+          if (dbAddr) setAddress(dbAddr);
+          const dbEmail = ans.contactEmail as string | undefined;
+          if (dbEmail) setContactEmail(dbEmail);
+        }
+      } catch {
+        // Keep local values
+      }
+    };
+
+    loadBackendSettings();
   }, []);
 
-  const handleSave = () => {
-    if (companyName) {
-      localStorage.setItem("zolution_org_name", companyName);
+  const handleSave = async () => {
+    setIsSaving(true);
+    const cleanName = companyName.trim();
+
+    if (cleanName) {
+      localStorage.setItem("zolution_org_name", cleanName);
       localStorage.setItem("zolution_org_industry", industry);
       localStorage.setItem("zolution_user_email", contactEmail);
-      window.dispatchEvent(new Event("storage"));
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    try {
+      await apiFetch("/agents/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          company_name: cleanName || undefined,
+          onboarding_answers: {
+            companyName: cleanName,
+            business_name: cleanName,
+            industry,
+            business_type: industry,
+            contactEmail,
+            phone,
+            whatsappPhone: phone,
+            address,
+          },
+        }),
+      });
+    } catch {
+      // Fallback local
+    } finally {
+      window.dispatchEvent(new Event("storage"));
+      setIsSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordStatus(null);
+    if (newPassword.trim().length < 6) {
+      setPasswordStatus({ type: "error", msg: "La contraseña debe tener al menos 6 caracteres." });
+      return;
+    }
+    setIsSavingPassword(true);
+    try {
+      await apiFetch("/auth/set-password", {
+        method: "POST",
+        body: JSON.stringify({ password: newPassword }),
+      });
+      setNewPassword("");
+      setPasswordStatus({
+        type: "success",
+        msg: "Contraseña configurada en PostgreSQL. Ya puedes iniciar sesión también con tu correo y contraseña.",
+      });
+    } catch (err: unknown) {
+      setPasswordStatus({
+        type: "error",
+        msg: err instanceof Error ? err.message : "No se pudo actualizar la contraseña.",
+      });
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   return (
@@ -59,15 +164,24 @@ export default function SettingsPage() {
             Ajustes de {companyName || "la Empresa"}
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Información de la organización, políticas de atención y reglas del tenant activo.
+            Información de la organización, políticas de atención y reglas del tenant activo sincronizadas en PostgreSQL.
           </p>
         </div>
 
-        <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs">
-          {saved ? (
+        <Button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+        >
+          {isSaving ? (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              Guardando...
+            </>
+          ) : saved ? (
             <>
               <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-300" />
-              ¡Guardado!
+              ¡Guardado en BD!
             </>
           ) : (
             <>
@@ -129,56 +243,102 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Tenant Isolation & RLS Details */}
-        <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Shield className="h-4 w-4 text-emerald-500" />
-              Seguridad Multi-Tenant
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Configuración de partición de base de datos y aislamiento del tenant.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-700/50 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-500">Tenant ID:</span>
-                <span className="font-mono text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">{tenant.id}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-500">Slug Identificador:</span>
-                <span className="font-mono text-zinc-800 dark:text-zinc-200">{tenant.slug}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-500">Base de Datos:</span>
-                <span className="font-medium text-zinc-800 dark:text-zinc-200">PostgreSQL (RLS habilitado)</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-500">Aislamiento de Citas y Chats:</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">100% Hermético</span>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-zinc-800 dark:text-zinc-200">Recordatorios Automáticos</p>
-                  <p className="text-[11px] text-zinc-500">Enviar mensaje por WhatsApp 24h antes del evento</p>
+        {/* Tenant Isolation & RLS Details + Password Management */}
+        <div className="space-y-6">
+          <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4 text-emerald-500" />
+                Seguridad Multi-Tenant
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Configuración de partición de base de datos y aislamiento del tenant.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-700/50 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500">Tenant ID:</span>
+                  <span className="font-mono text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">{tenant.id}</span>
                 </div>
-                <Switch defaultChecked />
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500">Slug Identificador:</span>
+                  <span className="font-mono text-zinc-800 dark:text-zinc-200">{tenant.slug}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500">Base de Datos:</span>
+                  <span className="font-medium text-zinc-800 dark:text-zinc-200">PostgreSQL (RLS habilitado)</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500">Aislamiento de Citas y Chats:</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">100% Hermético</span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-zinc-800 dark:text-zinc-200">Modo Fuera de Horario</p>
-                  <p className="text-[11px] text-zinc-500">El agente sigue respondiendo y agendando en horarios no laborales</p>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-zinc-800 dark:text-zinc-200">Recordatorios Automáticos</p>
+                    <p className="text-[11px] text-zinc-500">Enviar mensaje por WhatsApp 24h antes del evento</p>
+                  </div>
+                  <Switch defaultChecked />
                 </div>
-                <Switch defaultChecked />
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-zinc-800 dark:text-zinc-200">Modo Fuera de Horario</p>
+                    <p className="text-[11px] text-zinc-500">El agente sigue respondiendo y agendando en horarios no laborales</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-indigo-500" />
+                Contraseña de Acceso Manual
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Si te registraste con Google o deseas cambiar tu clave, configura aquí una contraseña para ingresar también con correo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdatePassword} className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Nueva contraseña (mínimo 6 caracteres)"
+                    className="h-9 text-xs"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={isSavingPassword || !newPassword.trim()}
+                    variant="outline"
+                    className="h-9 text-xs shrink-0"
+                  >
+                    {isSavingPassword ? "Actualizando..." : "Actualizar Clave"}
+                  </Button>
+                </div>
+                {passwordStatus && (
+                  <p
+                    className={`text-xs ${
+                      passwordStatus.type === "success"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-rose-600 dark:text-rose-400"
+                    }`}
+                  >
+                    {passwordStatus.msg}
+                  </p>
+                )}
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

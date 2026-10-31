@@ -62,20 +62,45 @@ export default function AgentConfigPage() {
     ]);
 
     try {
-      const data = await apiFetch<{
-        system_prompt_generated?: string | null;
-        llm_provider?: string;
-        llm_model?: string;
-        status?: string;
-      }>("/agents/me");
+      const [data, orgData] = await Promise.all([
+        apiFetch<{
+          system_prompt_generated?: string | null;
+          llm_provider?: string;
+          llm_model?: string;
+          status?: string;
+          onboarding_answers?: Record<string, unknown> | null;
+        }>("/agents/me"),
+        apiFetch<{
+          id?: string;
+          name?: string;
+          slug?: string;
+        }>("/organizations/me").catch(() => null),
+      ]);
+
+      if (orgData?.name) {
+        localStorage.setItem("zolution_org_name", orgData.name);
+        setTenant((prev) => ({
+          ...prev,
+          id: orgData.id || prev.id,
+          name: orgData.name || prev.name,
+          slug: orgData.slug || prev.slug,
+        }));
+      }
 
       if (data) {
-        if (data.system_prompt_generated && !ctx.prompt) {
+        if (data.system_prompt_generated) {
           setPrompt(data.system_prompt_generated);
+          localStorage.setItem("zolution_agent_prompt", data.system_prompt_generated);
         }
         if (data.llm_provider) setProvider(data.llm_provider);
         if (data.llm_model) setModel(data.llm_model);
         if (data.status) setIsActive(data.status === "active");
+        const dbIndustry = (data.onboarding_answers?.industry ||
+          data.onboarding_answers?.business_type) as string | undefined;
+        if (dbIndustry) {
+          localStorage.setItem("zolution_org_industry", dbIndustry);
+          setTenant((prev) => ({ ...prev, industry: dbIndustry }));
+        }
         setIsLiveApi(true);
       }
     } catch {
@@ -95,17 +120,18 @@ export default function AgentConfigPage() {
     localStorage.setItem("zolution_agent_prompt", prompt);
 
     try {
-      if (isLiveApi) {
-        await apiFetch("/agents/me/llm-provider", {
-          method: "PATCH",
-          body: JSON.stringify({
-            llm_provider: provider,
-            llm_model: model,
-          }),
-        });
-      }
+      await apiFetch("/agents/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          system_prompt_generated: prompt,
+          llm_provider: provider,
+          llm_model: model,
+          status: isActive ? "active" : "draft",
+        }),
+      });
+      setIsLiveApi(true);
     } catch {
-      // Fallback
+      // Fallback local
     } finally {
       setIsSaving(false);
       setSavedSuccess(true);

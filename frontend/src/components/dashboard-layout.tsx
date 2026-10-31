@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -85,6 +86,48 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
     loadTenant();
     setIsAuthChecked(true);
+
+    // Sync tenant metadata from PostgreSQL on active session
+    if (pathname !== "/login") {
+      const authTok =
+        localStorage.getItem("zolution_token") || localStorage.getItem("zolution_auth_token");
+      if (authTok) {
+        Promise.all([
+          apiFetch<{ id?: string; name?: string; slug?: string }>("/organizations/me").catch(
+            () => null
+          ),
+          apiFetch<{
+            system_prompt_generated?: string | null;
+            onboarding_answers?: Record<string, unknown> | null;
+          }>("/agents/me").catch(() => null),
+        ]).then(([orgRes, agentRes]) => {
+          let changed = false;
+          if (orgRes?.name) {
+            localStorage.setItem("zolution_org_name", orgRes.name);
+            setOrgName(orgRes.name);
+            changed = true;
+          }
+          if (orgRes?.id) localStorage.setItem("zolution_org_id", orgRes.id);
+          if (orgRes?.slug) localStorage.setItem("zolution_org_slug", orgRes.slug);
+
+          const dbIndustry = (agentRes?.onboarding_answers?.industry ||
+            agentRes?.onboarding_answers?.business_type) as string | undefined;
+          if (dbIndustry) {
+            localStorage.setItem("zolution_org_industry", dbIndustry);
+            setOrgIndustry(dbIndustry);
+            changed = true;
+          }
+          if (agentRes?.system_prompt_generated) {
+            localStorage.setItem("zolution_agent_prompt", agentRes.system_prompt_generated);
+            changed = true;
+          }
+          if (changed) {
+            window.dispatchEvent(new Event("storage"));
+          }
+        });
+      }
+    }
+
     window.addEventListener("storage", loadTenant);
     return () => window.removeEventListener("storage", loadTenant);
   }, [pathname, router]);
@@ -189,8 +232,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Dynamic Tenant Selector Pill with link to switch company */}
           <Link
-            href="/login"
-            title="Clic para cambiar de empresa o tenant"
+            href="/settings"
+            title="Clic para editar los ajustes de tu empresa"
             className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/50 transition-colors group cursor-pointer"
           >
             <div className="flex items-center gap-2 overflow-hidden">
