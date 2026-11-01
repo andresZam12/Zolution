@@ -171,6 +171,8 @@ export default function AgentConfigPage() {
         reply: string;
         tool_called?: string | null;
         appointment_created?: boolean;
+        used_provider?: string | null;
+        llm_errors?: string[];
       }>("/conversations/simulate", {
         method: "POST",
         body: JSON.stringify({
@@ -181,6 +183,15 @@ export default function AgentConfigPage() {
         }),
       });
 
+      if (!simRes.used_provider && simRes.llm_errors && simRes.llm_errors.length > 0) {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `⚠️ La IA no respondió (se usó respuesta básica). Motivo:\n- ${simRes.llm_errors!.join("\n- ")}`,
+          },
+        ]);
+      }
       const actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
       setChatMessages((prev) => [
         ...prev,
