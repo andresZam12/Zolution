@@ -65,16 +65,7 @@ export default function OverviewPage() {
       setTenant(ctx);
       setLang(currentLang);
       setRecentEvents(getTenantEvents(ctx.name, ctx.industry));
-      setSimMessages([
-        {
-          id: "welcome",
-          role: "assistant",
-          text:
-            currentLang === "en"
-              ? `Hi! I'm the virtual assistant for ${ctx.name}. How can I help you today?`
-              : `¡Hola! Soy el asistente virtual de ${ctx.name}. ¿En qué puedo colaborarte hoy?`,
-        },
-      ]);
+      setSimMessages([]);
     };
 
     refreshTenant();
@@ -439,7 +430,22 @@ export default function OverviewPage() {
               </button>
             </div>
 
-            <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-zinc-50/40 dark:bg-zinc-950/40">
+            <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-zinc-50/40 dark:bg-zinc-950/40 flex flex-col">
+              {simMessages.length === 0 && !simLoading && (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-zinc-400 space-y-2.5 my-auto">
+                  <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                    {lang === "en" ? "Ready to test your agent" : "Listo para probar tu agente"}
+                  </p>
+                  <p className="text-xs max-w-xs text-zinc-400 dark:text-zinc-500">
+                    {lang === "en"
+                      ? "Start chatting with your assistant by writing below."
+                      : "Inicia la conversación escribiéndole un saludo a tu asistente abajo."}
+                  </p>
+                </div>
+              )}
               {simMessages.map((msg) => (
                 <div
                   key={msg.id}

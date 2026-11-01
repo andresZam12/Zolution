@@ -67,15 +67,7 @@ export default function AgentConfigPage() {
     const initialPrompt = ctx.prompt || generateDefaultPrompt(ctx.name, ctx.industry);
     setPrompt(initialPrompt);
 
-    setChatMessages([
-      {
-        role: "assistant",
-        content:
-          currentLang === "en"
-            ? `Hi! I'm the virtual assistant for ${ctx.name}. How can we help you today?`
-            : `¡Hola! Soy el asistente virtual de ${ctx.name}. ¿En qué podemos ayudarte hoy?`,
-      },
-    ]);
+    setChatMessages([]);
 
     try {
       const [data, orgData] = await Promise.all([
@@ -198,11 +190,24 @@ export default function AgentConfigPage() {
       }
 
       if (!simRes.used_provider && simRes.llm_errors && simRes.llm_errors.length > 0) {
+        const cleanedErrors = simRes.llm_errors.map((err) => {
+          if (err.includes("insufficient_quota") || err.includes("no credits")) {
+            return "OpenAI: Tu cuenta no tiene créditos o saldo disponible en platform.openai.com.";
+          }
+          if (err.includes("anthropic-workspace-id") || err.includes("not scoped to a workspace")) {
+            return "Anthropic: Tu API key requiere configurar ANTHROPIC_WORKSPACE_ID o usar una key creada dentro de un Workspace.";
+          }
+          if (err.includes("no longer available") || err.includes("not found")) {
+            return "Google Gemini: Modelo no disponible en la versión configurada.";
+          }
+          return err.slice(0, 150);
+        });
+
         setChatMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: `⚠️ Los modelos LLM reportaron:\n- ${simRes.llm_errors!.join("\n- ")}`,
+            content: `ℹ️ Diagnóstico de conexión de IA:\n• ${cleanedErrors.join("\n• ")}`,
           },
         ]);
       }
@@ -356,13 +361,13 @@ export default function AgentConfigPage() {
                     onChange={(e) => {
                       setProvider(e.target.value);
                       if (e.target.value === "anthropic") setModel("claude-3-5-haiku-latest");
-                      else if (e.target.value === "google") setModel("gemini-2.0-flash");
+                      else if (e.target.value === "google") setModel("gemini-3.8-flash");
                       else setModel("gpt-4o-mini");
                     }}
                     className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
                   >
+                    <option value="google">Google Gemini (Gemini 3.8 Flash)</option>
                     <option value="openai">OpenAI (GPT-4o Mini)</option>
-                    <option value="google">Google Gemini (Gemini 2.0 Flash)</option>
                     <option value="anthropic">Anthropic (Claude 3.5 Haiku)</option>
                   </select>
                 </div>
@@ -376,7 +381,7 @@ export default function AgentConfigPage() {
                     onChange={(e) => setModel(e.target.value)}
                     placeholder={
                       provider === "google"
-                        ? "gemini-2.0-flash"
+                        ? "gemini-3.8-flash"
                         : provider === "anthropic"
                         ? "claude-3-5-haiku-latest"
                         : "gpt-4o-mini"
@@ -454,7 +459,22 @@ export default function AgentConfigPage() {
 
             <CardContent className="flex-1 flex flex-col p-4 space-y-4">
               {/* Message thread */}
-              <div className="flex-1 min-h-[360px] max-h-[500px] overflow-y-auto space-y-3 p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800">
+              <div className="flex-1 min-h-[360px] max-h-[500px] overflow-y-auto space-y-3 p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800 flex flex-col">
+                {chatMessages.length === 0 && !isSimulating && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-zinc-400 space-y-2.5 my-auto">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                      {lang === "en" ? "Ready to test your agent" : "Listo para probar tu agente"}
+                    </p>
+                    <p className="text-xs max-w-xs text-zinc-400 dark:text-zinc-500">
+                      {lang === "en"
+                        ? "Type a greeting or question in the box below to start the conversation."
+                        : "Escribe un saludo o pregunta en la barra inferior para iniciar la conversación."}
+                    </p>
+                  </div>
+                )}
                 {chatMessages.map((msg, index) => (
                   <div key={index} className="space-y-1">
                     {(msg.actionBadge || msg.providerBadge) && (
