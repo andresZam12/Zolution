@@ -10,8 +10,6 @@ import {
   CheckCircle2,
   Send,
   User,
-  Wifi,
-  WifiOff,
   RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,13 +19,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { apiFetch } from "@/lib/api";
-import { getTenantContext, generateDefaultPrompt, TenantContext } from "@/lib/tenant";
+import {
+  getTenantContext,
+  generateDefaultPrompt,
+  getAppLanguage,
+  formatToolLabel,
+  TenantContext,
+  AppLanguage,
+} from "@/lib/tenant";
+
+interface SimMessage {
+  role: string;
+  content: string;
+  actionBadge?: string;
+}
 
 export default function AgentConfigPage() {
+  const [lang, setLang] = useState<AppLanguage>("es");
   const [tenant, setTenant] = useState<TenantContext>({
     id: "dra-garcia-dental",
     slug: "dra-garcia-dental",
-    name: "Cargando empresa...",
+    name: "Mi Negocio",
     industry: "Servicios",
     email: "admin@zolution.ai",
   });
@@ -37,19 +49,19 @@ export default function AgentConfigPage() {
   const [isActive, setIsActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [isLiveApi, setIsLiveApi] = useState(false);
 
   const [prompt, setPrompt] = useState("");
 
   // Playground chat state
-  const [chatMessages, setChatMessages] = useState<Array<{ role: string; content: string }>>([]);
+  const [chatMessages, setChatMessages] = useState<SimMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
 
-  // Load configuration from backend if available, or fall back to tenant dynamic config
   const loadAgentConfig = async () => {
     const ctx = getTenantContext();
+    const currentLang = getAppLanguage();
     setTenant(ctx);
+    setLang(currentLang);
 
     const initialPrompt = ctx.prompt || generateDefaultPrompt(ctx.name, ctx.industry);
     setPrompt(initialPrompt);
@@ -57,7 +69,10 @@ export default function AgentConfigPage() {
     setChatMessages([
       {
         role: "assistant",
-        content: `¡Hola! Soy el asistente virtual de ${ctx.name}. ¿En qué podemos ayudarte hoy?`,
+        content:
+          currentLang === "en"
+            ? `Hi! I'm the virtual assistant for ${ctx.name}. How can we help you today?`
+            : `¡Hola! Soy el asistente virtual de ${ctx.name}. ¿En qué podemos ayudarte hoy?`,
       },
     ]);
 
@@ -101,10 +116,9 @@ export default function AgentConfigPage() {
           localStorage.setItem("zolution_org_industry", dbIndustry);
           setTenant((prev) => ({ ...prev, industry: dbIndustry }));
         }
-        setIsLiveApi(true);
       }
     } catch {
-      setIsLiveApi(false);
+      // Uses local state fallback
     }
   };
 
@@ -116,7 +130,6 @@ export default function AgentConfigPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Persist locally for immediate universal multi-tenant consistency
     localStorage.setItem("zolution_agent_prompt", prompt);
 
     try {
@@ -129,7 +142,6 @@ export default function AgentConfigPage() {
           status: isActive ? "active" : "draft",
         }),
       });
-      setIsLiveApi(true);
     } catch {
       // Fallback local
     } finally {
@@ -169,14 +181,14 @@ export default function AgentConfigPage() {
         }),
       });
 
-      const toolPrefix = simRes.tool_called ? `[Tool: ${simRes.tool_called}] ` : "";
+      const actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
       setChatMessages((prev) => [
         ...prev,
-        { role: "assistant", content: `${toolPrefix}${simRes.reply}` },
+        { role: "assistant", content: simRes.reply, actionBadge: actionLabel },
       ]);
-      setIsLiveApi(true);
     } catch {
       let reply = `Entendido, en ${tenant.name} con gusto te ayudamos.`;
+      let actionBadge = formatToolLabel("llm_answer", lang);
       const lower = userMsg.toLowerCase();
       if (
         lower.includes("cita") ||
@@ -185,7 +197,8 @@ export default function AgentConfigPage() {
         lower.includes("agendar") ||
         lower.includes("disponib")
       ) {
-        reply = `Claro, permíteme consultar la agenda disponible en Google Calendar... Para mañana tenemos espacio a las 10:00 AM y a las 3:30 PM. ¿Cuál horario te queda mejor?`;
+        actionBadge = formatToolLabel("check_availability", lang);
+        reply = `Claro, permíteme revisar la agenda en Google Calendar... Para mañana tenemos espacio a las 10:00 AM y a las 3:30 PM. ¿Cuál horario te queda mejor?`;
       } else if (
         lower.includes("10") ||
         lower.includes("3") ||
@@ -193,16 +206,17 @@ export default function AgentConfigPage() {
         lower.includes("perfecto") ||
         lower.includes("sí")
       ) {
-        reply = `¡Excelente! He agendado formalmente tu cita en el calendario de ${tenant.name}. Te llegará un recordatorio por WhatsApp un día antes. ¿Deseas consultar algo más?`;
+        actionBadge = formatToolLabel("book_appointment", lang);
+        reply = `¡Excelente! He agendado tu cita en el calendario de ${tenant.name}. Te llegará un recordatorio por WhatsApp un día antes. ¿Deseas consultar algo más?`;
       } else if (
         lower.includes("costo") ||
         lower.includes("precio") ||
         lower.includes("tarifa") ||
         lower.includes("servicio")
       ) {
-        reply = `En ${tenant.name} manejamos planes adaptados a tus requerimientos. Con mucho gusto podemos agendar una sesión inicial de diagnóstico para evaluar tu caso. ¿Te gustaría apartar un horario?`;
+        reply = `En ${tenant.name} contamos con opciones adaptadas a tus necesidades. Con gusto podemos agendar una cita inicial para brindarte atención personalizada. ¿Te gustaría reservar un espacio?`;
       }
-      setChatMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      setChatMessages((prev) => [...prev, { role: "assistant", content: reply, actionBadge }]);
     } finally {
       setIsSimulating(false);
     }
@@ -211,63 +225,46 @@ export default function AgentConfigPage() {
   return (
     <div className="space-y-6">
       {/* Header with Save actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200/70 dark:border-zinc-800/80 pb-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Bot className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            Configuración del Agente IA · {tenant.name}
+            {lang === "en" ? `My Agent · ${tenant.name}` : `Mi Agente · ${tenant.name}`}
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Personaliza la personalidad, instrucciones del sistema y modelos de lenguaje de {tenant.name}.
+            {lang === "en"
+              ? `Customize how your virtual assistant greets customers and manages appointments for ${tenant.name}.`
+              : `Personaliza cómo saluda tu asistente, qué información solicita y cómo agenda las citas de ${tenant.name}.`}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <Badge
-            variant="outline"
-            className={`text-xs gap-1.5 py-1 ${
-              isLiveApi
-                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-            }`}
-          >
-            {isLiveApi ? (
-              <>
-                <Wifi className="h-3 w-3 text-emerald-500" />
-                Backend Sync Activo
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3 w-3 text-zinc-400" />
-                Modo Demo
-              </>
-            )}
-          </Badge>
-
           <div className="flex items-center gap-2 mr-2">
-            <span className="text-xs font-medium text-zinc-500">Agente Activo:</span>
+            <span className="text-xs font-medium text-zinc-500">
+              {lang === "en" ? "Agent Active:" : "Agente Activo:"}
+            </span>
             <Switch checked={isActive} onCheckedChange={setIsActive} />
           </div>
 
           <Button
             onClick={handleSave}
             disabled={isSaving}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs cursor-pointer"
           >
             {isSaving ? (
               <>
                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
+                {lang === "en" ? "Saving..." : "Guardando..."}
               </>
             ) : savedSuccess ? (
               <>
                 <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-300" />
-                ¡Guardado!
+                {lang === "en" ? "Saved!" : "¡Guardado!"}
               </>
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Guardar Cambios
+                {lang === "en" ? "Save Changes" : "Guardar Cambios"}
               </>
             )}
           </Button>
@@ -275,21 +272,22 @@ export default function AgentConfigPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Prompt & Model Configuration */}
+        {/* Left Column: Instructions & Preferences */}
         <div className="lg:col-span-7 space-y-6">
           {/* Prompt Editor */}
-          <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+          <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base font-semibold">Prompt del Sistema (System Instructions)</CardTitle>
+                  <CardTitle className="text-base font-semibold">
+                    {lang === "en" ? "Assistant Instructions" : "Instrucciones de tu Asistente"}
+                  </CardTitle>
                   <CardDescription className="text-xs">
-                    Define cómo debe saludar, qué información pedir y las políticas de atención de {tenant.name}.
+                    {lang === "en"
+                      ? `Write in plain language how the assistant should care for your customers at ${tenant.name}.`
+                      : `Indica en lenguaje sencillo cómo debe atender tu asistente a los clientes de ${tenant.name}.`}
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="text-xs font-mono text-indigo-600 dark:text-indigo-400">
-                  {prompt.length} caracteres
-                </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -297,40 +295,50 @@ export default function AgentConfigPage() {
                 rows={13}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="font-mono text-xs sm:text-sm leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 resize-y border-zinc-200 dark:border-zinc-800"
-                placeholder="Escribe las instrucciones para el asistente..."
+                className="text-xs sm:text-sm leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 resize-y border-zinc-200 dark:border-zinc-800"
+                placeholder={
+                  lang === "en"
+                    ? "Write instructions for your assistant..."
+                    : "Escribe las instrucciones para tu asistente..."
+                }
               />
               <div className="flex items-center justify-between text-xs text-zinc-500">
-                <span>Variables: &#123;&#123;nombre_cliente&#125;&#125;, &#123;&#123;telefono&#125;&#125;</span>
+                <span>
+                  {lang === "en"
+                    ? "Tip: Include your business hours and tone of voice."
+                    : "Consejo: Incluye tus horarios de atención y el tono de trato que prefieras."}
+                </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleResetToDefault}
-                  className="text-xs h-7 text-zinc-400 hover:text-zinc-600"
+                  className="text-xs h-7 text-zinc-400 hover:text-zinc-600 cursor-pointer"
                 >
                   <RotateCcw className="mr-1 h-3 w-3" />
-                  Restaurar para {tenant.name}
+                  {lang === "en" ? "Restore suggested template" : "Restaurar plantilla sugerida"}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Model and Parameters */}
-          <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+          {/* AI Engine & Capabilities */}
+          <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Sliders className="h-4 w-4 text-indigo-500" />
-                Parámetros del Proveedor de LLM
+                {lang === "en" ? "Response Style & Capabilities" : "Estilo de Respuesta y Capacidades"}
               </CardTitle>
               <CardDescription className="text-xs">
-                Soporte multi-proveedor desacoplado mediante el patrón Factory del Backend.
+                {lang === "en"
+                  ? "Adjust the intelligence engine and automatic actions enabled for your business."
+                  : "Ajusta el motor de inteligencia y las acciones automáticas habilitadas para tu negocio."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Proveedor de IA
+                    {lang === "en" ? "AI Engine" : "Motor de Inteligencia"}
                   </label>
                   <select
                     value={provider}
@@ -350,7 +358,7 @@ export default function AgentConfigPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Modelo
+                    {lang === "en" ? "Version" : "Versión"}
                   </label>
                   <Input
                     value={model}
@@ -363,9 +371,13 @@ export default function AgentConfigPage() {
               <div className="space-y-2 pt-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Creatividad / Temperatura: {temperature}
+                    {lang === "en"
+                      ? `Flexibility / Tone Warmth: ${temperature}`
+                      : `Naturalidad de la conversación: ${temperature}`}
                   </span>
-                  <span className="text-zinc-400">Recomendado: 0.2 - 0.4 para citas y atención</span>
+                  <span className="text-zinc-400">
+                    {lang === "en" ? "Recommended: 0.2 - 0.4" : "Recomendado: 0.2 - 0.4"}
+                  </span>
                 </div>
                 <input
                   type="range"
@@ -378,19 +390,21 @@ export default function AgentConfigPage() {
                 />
               </div>
 
-              {/* Tools enabled */}
+              {/* Natural Language Capabilities */}
               <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
                 <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  Herramientas Habilitadas (Function Calling)
+                  {lang === "en" ? "Active Capabilities" : "Acciones Automáticas Activas"}
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>check_availability (Google Cal)</span>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>
+                      {lang === "en" ? "Availability check" : "Consulta de disponibilidad"}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>book_appointment (Google Cal)</span>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>{lang === "en" ? "Appointment booking" : "Cita agendada en calendario"}</span>
                   </div>
                 </div>
               </div>
@@ -400,58 +414,75 @@ export default function AgentConfigPage() {
 
         {/* Right Column: Live Testing Playground */}
         <div className="lg:col-span-5">
-          <Card className="h-full flex flex-col border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+          <Card className="h-full flex flex-col border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
             <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-indigo-500" />
-                    Simulador en Vivo · WhatsApp
+                    {lang === "en" ? "Simulate Chat" : "Simular Chat"}
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Prueba cómo responde el agente de {tenant.name} en tiempo real.
+                    {lang === "en"
+                      ? `Test how your assistant responds to ${tenant.name} customers.`
+                      : `Prueba cómo responde tu asistente a los clientes de ${tenant.name}.`}
                   </CardDescription>
                 </div>
                 <Badge variant="secondary" className="text-[10px] bg-zinc-100 dark:bg-zinc-800">
-                  WhatsApp Preview
+                  WhatsApp
                 </Badge>
               </div>
             </CardHeader>
 
             <CardContent className="flex-1 flex flex-col p-4 space-y-4">
               {/* Message thread */}
-              <div className="flex-1 min-h-[360px] max-h-[500px] overflow-y-auto space-y-3 p-3 rounded-xl bg-zinc-100/60 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800">
+              <div className="flex-1 min-h-[360px] max-h-[500px] overflow-y-auto space-y-3 p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800">
                 {chatMessages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-start gap-2.5 ${
-                      msg.role === "user" ? "flex-row-reverse" : "flex-row"
-                    }`}
-                  >
+                  <div key={index} className="space-y-1">
+                    {msg.actionBadge && (
+                      <div className="ml-9">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          {msg.actionBadge}
+                        </span>
+                      </div>
+                    )}
                     <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 ${
-                        msg.role === "user"
-                          ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900"
-                          : "bg-indigo-600 text-white"
+                      className={`flex items-start gap-2.5 ${
+                        msg.role === "user" ? "flex-row-reverse" : "flex-row"
                       }`}
                     >
-                      {msg.role === "user" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                    </div>
-                    <div
-                      className={`p-3 rounded-2xl text-xs sm:text-sm max-w-[80%] leading-relaxed shadow-2xs ${
-                        msg.role === "user"
-                          ? "bg-indigo-600 text-white rounded-tr-none"
-                          : "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-700/60 rounded-tl-none"
-                      }`}
-                    >
-                      {msg.content}
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                          msg.role === "user"
+                            ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900"
+                            : "bg-indigo-600 text-white"
+                        }`}
+                      >
+                        {msg.role === "user" ? (
+                          <User className="h-3.5 w-3.5" />
+                        ) : (
+                          <Bot className="h-3.5 w-3.5" />
+                        )}
+                      </div>
+                      <div
+                        className={`p-3 rounded-2xl text-xs sm:text-sm max-w-[80%] leading-relaxed shadow-2xs ${
+                          msg.role === "user"
+                            ? "bg-indigo-600 text-white rounded-tr-none"
+                            : "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-700/60 rounded-tl-none"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
                     </div>
                   </div>
                 ))}
                 {isSimulating && (
                   <div className="flex items-center gap-2 text-xs text-zinc-400 p-2 italic">
                     <Sparkles className="h-3.5 w-3.5 animate-spin text-indigo-500" />
-                    El agente está consultando disponibilidad...
+                    {lang === "en"
+                      ? "Checking calendar and preparing reply..."
+                      : "Revisando tu agenda y preparando respuesta..."}
                   </div>
                 )}
               </div>
@@ -467,10 +498,18 @@ export default function AgentConfigPage() {
                 <Input
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder="Escribe como si fueras un cliente..."
+                  placeholder={
+                    lang === "en"
+                      ? "Write as if you were a customer..."
+                      : "Escribe como si fueras un cliente..."
+                  }
                   className="text-xs sm:text-sm h-10"
                 />
-                <Button type="submit" size="icon" className="h-10 w-10 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="h-10 w-10 shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer"
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </form>

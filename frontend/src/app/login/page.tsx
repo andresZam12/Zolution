@@ -67,7 +67,7 @@ function LoginContent() {
 
     if (savedState && returnedState && returnedState !== savedState) {
       setErrorMessage(
-        "Error de seguridad: La firma de estado de Google no coincide (protección anti-CSRF). Intenta de nuevo."
+        "Error de seguridad: La firma de estado de Google no coincide. Intenta de nuevo."
       );
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
@@ -148,7 +148,6 @@ function LoginContent() {
     setErrorMessage(null);
     try {
       const redirectUri = window.location.origin + "/login";
-      // Generate cryptographically random state token for Anti-CSRF protection (RFC 6749)
       const state =
         (typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID().replace(/-/g, "")
@@ -168,7 +167,7 @@ function LoginContent() {
         rawMessage.includes("Google OAuth no está configurado")
       ) {
         setErrorMessage(
-          "El acceso directo con Google requiere registrar GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en Render. Mientras lo configuras, puedes registrarte o ingresar usando tu correo con código de verificación."
+          "El acceso directo con Google no está disponible en este momento. Puedes registrarte o ingresar usando tu correo con código de verificación."
         );
       } else {
         setErrorMessage(rawMessage);
@@ -180,7 +179,7 @@ function LoginContent() {
   const effectiveIndustry =
     industry === "Otro" ? (customIndustry.trim() || "Otro Sector") : industry;
 
-  // Step 1: Request 6-digit OTP code to email (the code is only delivered by email)
+  // Step 1: Request 6-digit OTP code to email
   const handleRequestOtp = async (e: React.FormEvent | React.MouseEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -212,7 +211,7 @@ function LoginContent() {
     }
   };
 
-  // Step 2: Verify OTP code and create User + Organization in DB
+  // Step 2: Verify OTP code and finish registration
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpCode || otpCode.trim().length < 6) {
@@ -302,29 +301,29 @@ function LoginContent() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white font-black text-2xl shadow-xl shadow-indigo-500/25">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white font-black text-2xl shadow-xs">
           Z
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
           Zolution
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
-          Plataforma Multi-Tenant de Agentes de IA para WhatsApp y Sincronización en Google Calendar
+          Asistente virtual inteligente para WhatsApp y Google Calendar
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg space-y-6">
-        <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xl overflow-hidden">
+        <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-lg overflow-hidden">
           {/* Top Google Loading Banner */}
           {isGoogleLoading && (
             <div className="bg-indigo-600 text-white text-xs py-2 px-4 text-center flex items-center justify-center gap-2">
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              <span>Conectando con Google y vinculando credenciales...</span>
+              <span>Conectando con Google...</span>
             </div>
           )}
 
           <CardHeader className="pb-3">
-            <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-0.5 bg-zinc-100 dark:bg-zinc-900 text-xs mb-2">
+            <div className="flex rounded-xl border border-zinc-200/80 dark:border-zinc-800 p-0.5 bg-zinc-100/80 dark:bg-zinc-900 text-xs mb-2">
               <button
                 type="button"
                 onClick={() => {
@@ -332,9 +331,9 @@ function LoginContent() {
                   setRegStep(1);
                   setErrorMessage(null);
                 }}
-                className={`w-1/2 py-1.5 rounded-md transition-all font-medium ${
+                className={`w-1/2 py-1.5 rounded-lg transition-all font-medium cursor-pointer ${
                   !isRegister
-                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs"
+                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs"
                     : "text-zinc-500"
                 }`}
               >
@@ -346,49 +345,49 @@ function LoginContent() {
                   setIsRegister(true);
                   setErrorMessage(null);
                 }}
-                className={`w-1/2 py-1.5 rounded-md transition-all font-medium ${
+                className={`w-1/2 py-1.5 rounded-lg transition-all font-medium cursor-pointer ${
                   isRegister
-                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs"
+                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs"
                     : "text-zinc-500"
                 }`}
               >
-                Registrar Empresa
+                Registrar Negocio
               </button>
             </div>
 
             <CardTitle className="text-lg font-bold">
               {isRegister
                 ? regStep === 1
-                  ? "Crea la cuenta de tu empresa"
+                  ? "Crea la cuenta de tu negocio"
                   : "Verifica tu correo electrónico"
-                : "Acceso al Panel de Control"}
+                : "Iniciar Sesión"}
             </CardTitle>
             <CardDescription className="text-xs">
               {isRegister
                 ? regStep === 1
-                  ? "Automatiza la atención y el agendamiento de citas en tiempo real."
+                  ? "Atiende a tus clientes y agenda citas de forma automática."
                   : `Ingresa el código de 6 dígitos enviado a ${email}.`
-                : "Inicia sesión con tu correo electrónico y contraseña."}
+                : "Ingresa con tu correo y contraseña."}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             {/* Feedback Alerts */}
             {errorMessage && (
-              <div className="p-3 rounded-lg text-xs bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40 flex items-center gap-2">
+              <div className="p-3 rounded-xl text-xs bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
             {successMessage && (
-              <div className="p-3 rounded-lg text-xs bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-2">
+              <div className="p-3 rounded-xl text-xs bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <span>{successMessage}</span>
               </div>
             )}
 
-            {/* Google Fast Authentication Button (Solo para registrar empresa) */}
+            {/* Google Authentication Button */}
             {isRegister && regStep === 1 && (
               <>
                 <Button
@@ -396,7 +395,7 @@ function LoginContent() {
                   variant="outline"
                   onClick={handleGoogleSignIn}
                   disabled={isGoogleLoading}
-                  className="w-full h-10 text-xs border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-2.5 font-medium shadow-2xs"
+                  className="w-full h-10 text-xs border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-2.5 font-medium shadow-2xs cursor-pointer"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -417,8 +416,11 @@ function LoginContent() {
                     />
                   </svg>
                   <span>Registrarse con Google</span>
-                  <Badge variant="outline" className="text-[9px] py-0 px-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                    Acceso Rápido
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] py-0 px-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                  >
+                    Rápido
                   </Badge>
                 </Button>
 
@@ -436,7 +438,7 @@ function LoginContent() {
               <form onSubmit={handleRequestOtp} className="space-y-3.5 text-xs">
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Nombre de la Empresa o Negocio
+                    Nombre de tu Negocio o Empresa
                   </label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
@@ -444,7 +446,7 @@ function LoginContent() {
                       required
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder="Ej. Estudio Jurídico, Nexo Cloud, Wellness Spa..."
+                      placeholder="Ej. Clínica Dental, Despacho Jurídico..."
                       className="pl-9 h-9 text-xs"
                     />
                   </div>
@@ -452,7 +454,7 @@ function LoginContent() {
 
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Sector o Industria
+                    Sector o Especialidad
                   </label>
                   <select
                     value={industry}
@@ -463,16 +465,18 @@ function LoginContent() {
                     <option value="Servicios Legales y Jurídicos">Servicios Legales y Jurídicos</option>
                     <option value="Tecnología, Cloud & Soporte TI">Tecnología, Cloud & Soporte TI</option>
                     <option value="Bienestar, Spa & Belleza">Bienestar, Spa & Belleza</option>
-                    <option value="Servicios Profesionales y Consultoría">Servicios Profesionales y Consultoría</option>
+                    <option value="Servicios Profesionales y Consultoría">
+                      Servicios Profesionales y Consultoría
+                    </option>
                     <option value="Comercio y Retail">Comercio y Retail</option>
-                    <option value="Otro">Otro (Especificar sector o gremio)</option>
+                    <option value="Otro">Otro (Especificar sector)</option>
                   </select>
                   {industry === "Otro" && (
                     <Input
                       required
                       value={customIndustry}
                       onChange={(e) => setCustomIndustry(e.target.value)}
-                      placeholder="Escribe tu sector o gremio (ej. Restaurantes, Construcción...)"
+                      placeholder="Escribe tu sector (ej. Restaurantes, Construcción...)"
                       className="h-9 text-xs mt-1.5"
                     />
                   )}
@@ -480,7 +484,7 @@ function LoginContent() {
 
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Correo Electrónico (Recibirá código de verificación)
+                    Correo Electrónico (Recibirás tu código de acceso)
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
@@ -489,7 +493,7 @@ function LoginContent() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@tuempresa.com"
+                      placeholder="contacto@tuempresa.com"
                       className="pl-9 h-9 text-xs"
                     />
                   </div>
@@ -516,7 +520,7 @@ function LoginContent() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs shadow-md mt-2"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-9 text-xs shadow-xs mt-2 cursor-pointer"
                 >
                   {isLoading ? "Enviando código..." : "Enviar Código de Verificación"}
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -544,16 +548,16 @@ function LoginContent() {
                     />
                   </div>
                   <p className="text-[11px] text-zinc-400 mt-1">
-                    Enviado a <strong>{email}</strong> (vence en 10 min)
+                    Enviado a <strong>{email}</strong>
                   </p>
                 </div>
 
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-10 text-xs shadow-md font-semibold"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-10 text-xs shadow-xs font-semibold cursor-pointer"
                 >
-                  {isLoading ? "Verificando en base de datos..." : "Verificar y Crear Empresa"}
+                  {isLoading ? "Verificando código..." : "Verificar y Crear Cuenta"}
                   <CheckCircle2 className="ml-1.5 h-4 w-4" />
                 </Button>
 
@@ -561,7 +565,7 @@ function LoginContent() {
                   <button
                     type="button"
                     onClick={() => setRegStep(1)}
-                    className="text-zinc-500 hover:underline flex items-center gap-1"
+                    className="text-zinc-500 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="h-3 w-3" />
                     Corregir datos
@@ -569,7 +573,7 @@ function LoginContent() {
                   <button
                     type="button"
                     onClick={handleRequestOtp}
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium cursor-pointer"
                   >
                     Reenviar código
                   </button>
@@ -577,7 +581,7 @@ function LoginContent() {
               </form>
             )}
 
-            {/* Google Fast Authentication Button (Para iniciar sesión) */}
+            {/* Google Authentication Button for Login */}
             {!isRegister && (
               <>
                 <Button
@@ -585,7 +589,7 @@ function LoginContent() {
                   variant="outline"
                   onClick={handleGoogleSignIn}
                   disabled={isGoogleLoading}
-                  className="w-full h-10 text-xs border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-2.5 font-medium shadow-2xs"
+                  className="w-full h-10 text-xs border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-2.5 font-medium shadow-2xs cursor-pointer"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -631,7 +635,7 @@ function LoginContent() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@tuempresa.com"
+                      placeholder="contacto@tuempresa.com"
                       className="pl-9 h-9 text-xs"
                     />
                   </div>
@@ -657,7 +661,7 @@ function LoginContent() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs shadow-md mt-2"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-9 text-xs shadow-xs mt-2 cursor-pointer"
                 >
                   {isLoading ? "Validando credenciales..." : "Ingresar al Panel"}
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -669,7 +673,7 @@ function LoginContent() {
 
         <div className="text-center text-xs text-zinc-400 flex items-center justify-center gap-1.5 pt-2">
           <ShieldCheck className="h-4 w-4 text-emerald-500" />
-          <span>Autenticación Criptográfica JWT y Aislamiento por Tenant (PostgreSQL RLS)</span>
+          <span>Acceso protegido y confidencialidad para tu negocio</span>
         </div>
       </div>
     </div>

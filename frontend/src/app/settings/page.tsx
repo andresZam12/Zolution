@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import {
   Settings,
   Building,
-  Shield,
+  Bell,
   Save,
   CheckCircle2,
   KeyRound,
@@ -15,13 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { apiFetch } from "@/lib/api";
-import { getTenantContext, TenantContext } from "@/lib/tenant";
+import { getTenantContext, getAppLanguage, TenantContext, AppLanguage } from "@/lib/tenant";
 
 export default function SettingsPage() {
+  const [lang, setLang] = useState<AppLanguage>("es");
   const [tenant, setTenant] = useState<TenantContext>({
     id: "org-1",
     slug: "org-1",
-    name: "Cargando empresa...",
+    name: "Mi Negocio",
     industry: "Servicios Profesionales",
     email: "contacto@empresa.com",
   });
@@ -29,27 +30,38 @@ export default function SettingsPage() {
   const [industry, setIndustry] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [phone, setPhone] = useState("+57 310 987 6543");
-  const [address, setAddress] = useState("Sede Central Empresarial");
+  const [address, setAddress] = useState("Sede Principal");
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Optional password update state (for Google OAuth users or password change)
+  // Optional password update state
   const [newPassword, setNewPassword] = useState("");
   const [isSavingPassword, setIsSavingPassword] = useState(false);
-  const [passwordStatus, setPasswordStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [passwordStatus, setPasswordStatus] = useState<{
+    type: "success" | "error";
+    msg: string;
+  } | null>(null);
 
   useEffect(() => {
-    const ctx = getTenantContext();
-    setTenant(ctx);
-    setCompanyName(ctx.name);
-    setIndustry(ctx.industry);
-    setContactEmail(ctx.email);
+    const syncLocal = () => {
+      const ctx = getTenantContext();
+      setTenant(ctx);
+      setLang(getAppLanguage());
+      setCompanyName(ctx.name);
+      setIndustry(ctx.industry);
+      setContactEmail(ctx.email);
+    };
+    syncLocal();
 
     const loadBackendSettings = async () => {
       try {
         const [orgData, agentData] = await Promise.all([
-          apiFetch<{ id?: string; name?: string; slug?: string }>("/organizations/me").catch(() => null),
-          apiFetch<{ onboarding_answers?: Record<string, unknown> | null }>("/agents/me").catch(() => null),
+          apiFetch<{ id?: string; name?: string; slug?: string }>("/organizations/me").catch(
+            () => null
+          ),
+          apiFetch<{ onboarding_answers?: Record<string, unknown> | null }>("/agents/me").catch(
+            () => null
+          ),
         ]);
 
         if (orgData) {
@@ -88,6 +100,8 @@ export default function SettingsPage() {
     };
 
     loadBackendSettings();
+    window.addEventListener("storage", syncLocal);
+    return () => window.removeEventListener("storage", syncLocal);
   }, []);
 
   const handleSave = async () => {
@@ -131,7 +145,13 @@ export default function SettingsPage() {
     e.preventDefault();
     setPasswordStatus(null);
     if (newPassword.trim().length < 6) {
-      setPasswordStatus({ type: "error", msg: "La contraseña debe tener al menos 6 caracteres." });
+      setPasswordStatus({
+        type: "error",
+        msg:
+          lang === "en"
+            ? "Password must be at least 6 characters."
+            : "La contraseña debe tener al menos 6 caracteres.",
+      });
       return;
     }
     setIsSavingPassword(true);
@@ -143,12 +163,20 @@ export default function SettingsPage() {
       setNewPassword("");
       setPasswordStatus({
         type: "success",
-        msg: "Contraseña configurada en PostgreSQL. Ya puedes iniciar sesión también con tu correo y contraseña.",
+        msg:
+          lang === "en"
+            ? "Password updated! You can now sign in with your email and password."
+            : "¡Contraseña actualizada! Ya puedes iniciar sesión con tu correo y contraseña.",
       });
     } catch (err: unknown) {
       setPasswordStatus({
         type: "error",
-        msg: err instanceof Error ? err.message : "No se pudo actualizar la contraseña.",
+        msg:
+          err instanceof Error
+            ? err.message
+            : lang === "en"
+              ? "Could not update password."
+              : "No se pudo actualizar la contraseña.",
       });
     } finally {
       setIsSavingPassword(false);
@@ -157,137 +185,158 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200/70 dark:border-zinc-800/80 pb-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Settings className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            Ajustes de {companyName || "la Empresa"}
+            {lang === "en"
+              ? `Settings · ${companyName || tenant.name}`
+              : `Ajustes de ${companyName || tenant.name}`}
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Información de la organización, políticas de atención y reglas del tenant activo sincronizadas en PostgreSQL.
+            {lang === "en"
+              ? "Manage your business information, customer care preferences, and account access."
+              : "Administra los datos de tu negocio, preferencias de atención y acceso a tu cuenta."}
           </p>
         </div>
 
         <Button
           onClick={handleSave}
           disabled={isSaving}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+          className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs cursor-pointer"
         >
           {isSaving ? (
             <>
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              Guardando...
+              {lang === "en" ? "Saving..." : "Guardando..."}
             </>
           ) : saved ? (
             <>
               <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-300" />
-              ¡Guardado en BD!
+              {lang === "en" ? "Saved!" : "¡Cambios Guardados!"}
             </>
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              Guardar Ajustes
+              {lang === "en" ? "Save Settings" : "Guardar Ajustes"}
             </>
           )}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Organization Information */}
-        <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+        {/* Business Profile */}
+        <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Building className="h-4 w-4 text-indigo-500" />
-              Perfil de la Empresa
+              {lang === "en" ? "Business Profile" : "Datos de tu Negocio"}
             </CardTitle>
             <CardDescription className="text-xs">
-              Datos generales que el asistente de IA utilizará para presentarse ante los clientes.
+              {lang === "en"
+                ? "General details your assistant uses when greeting customers."
+                : "Información general que tu asistente utilizará para atender a tus clientes."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                Nombre de la Empresa o Negocio
+                {lang === "en" ? "Business Name" : "Nombre del Negocio o Empresa"}
               </label>
-              <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="h-9 text-sm" />
+              <Input
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="h-9 text-sm"
+              />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                Sector o Industria
+                {lang === "en" ? "Industry or Specialty" : "Sector o Especialidad"}
               </label>
-              <Input value={industry} onChange={(e) => setIndustry(e.target.value)} className="h-9 text-sm" />
+              <Input
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                className="h-9 text-sm"
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  Correo de Contacto
+                  {lang === "en" ? "Contact Email" : "Correo de Contacto"}
                 </label>
-                <Input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="h-9 text-sm" />
+                <Input
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="h-9 text-sm"
+                />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  Teléfono Principal
+                  {lang === "en" ? "WhatsApp / Phone" : "Teléfono / WhatsApp"}
                 </label>
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9 text-sm" />
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="h-9 text-sm"
+                />
               </div>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                Dirección Física o Cobertura
+                {lang === "en" ? "Location or Address" : "Dirección o Ubicación"}
               </label>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} className="h-9 text-sm" />
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="h-9 text-sm"
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* Tenant Isolation & RLS Details + Password Management */}
+        {/* Customer Care Preferences + Password Management */}
         <div className="space-y-6">
-          <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+          <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Shield className="h-4 w-4 text-emerald-500" />
-                Seguridad Multi-Tenant
+                <Bell className="h-4 w-4 text-emerald-500" />
+                {lang === "en" ? "Attention Preferences" : "Preferencias de Atención"}
               </CardTitle>
               <CardDescription className="text-xs">
-                Configuración de partición de base de datos y aislamiento del tenant.
+                {lang === "en"
+                  ? "Configure how your assistant interacts with your customers."
+                  : "Configura cómo interactúa tu asistente con tus clientes en el día a día."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-xs">
-              <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-700/50 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Tenant ID:</span>
-                  <span className="font-mono text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">{tenant.id}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Slug Identificador:</span>
-                  <span className="font-mono text-zinc-800 dark:text-zinc-200">{tenant.slug}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Base de Datos:</span>
-                  <span className="font-medium text-zinc-800 dark:text-zinc-200">PostgreSQL (RLS habilitado)</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Aislamiento de Citas y Chats:</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">100% Hermético</span>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
                   <div>
-                    <p className="font-medium text-zinc-800 dark:text-zinc-200">Recordatorios Automáticos</p>
-                    <p className="text-[11px] text-zinc-500">Enviar mensaje por WhatsApp 24h antes del evento</p>
+                    <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                      {lang === "en" ? "Automatic Reminders" : "Recordatorios Automáticos"}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      {lang === "en"
+                        ? "Send a WhatsApp reminder 24 hours before the appointment"
+                        : "Enviar mensaje de recordatorio por WhatsApp 24h antes de la cita"}
+                    </p>
                   </div>
                   <Switch defaultChecked />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
                   <div>
-                    <p className="font-medium text-zinc-800 dark:text-zinc-200">Modo Fuera de Horario</p>
-                    <p className="text-[11px] text-zinc-500">El agente sigue respondiendo y agendando en horarios no laborales</p>
+                    <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                      {lang === "en" ? "24/7 After-Hours Service" : "Atención Fuera de Horario"}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      {lang === "en"
+                        ? "Keep answering questions and scheduling appointments at night and on weekends"
+                        : "Tu asistente sigue respondiendo y agendando citas en noches y fines de semana"}
+                    </p>
                   </div>
                   <Switch defaultChecked />
                 </div>
@@ -295,14 +344,16 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+          <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-indigo-500" />
-                Contraseña de Acceso Manual
+                {lang === "en" ? "Account Password" : "Contraseña de Acceso"}
               </CardTitle>
               <CardDescription className="text-xs">
-                Si te registraste con Google o deseas cambiar tu clave, configura aquí una contraseña para ingresar también con correo.
+                {lang === "en"
+                  ? "If you signed up with Google or want to change your password, set a new one here."
+                  : "Si ingresaste con Google o deseas cambiar tu clave, configura aquí tu contraseña."}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -312,16 +363,26 @@ export default function SettingsPage() {
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Nueva contraseña (mínimo 6 caracteres)"
+                    placeholder={
+                      lang === "en"
+                        ? "New password (min. 6 characters)"
+                        : "Nueva contraseña (mínimo 6 caracteres)"
+                    }
                     className="h-9 text-xs"
                   />
                   <Button
                     type="submit"
                     disabled={isSavingPassword || !newPassword.trim()}
                     variant="outline"
-                    className="h-9 text-xs shrink-0"
+                    className="h-9 text-xs shrink-0 cursor-pointer"
                   >
-                    {isSavingPassword ? "Actualizando..." : "Actualizar Clave"}
+                    {isSavingPassword
+                      ? lang === "en"
+                        ? "Updating..."
+                        : "Actualizando..."
+                      : lang === "en"
+                        ? "Update Password"
+                        : "Actualizar Clave"}
                   </Button>
                 </div>
                 {passwordStatus && (

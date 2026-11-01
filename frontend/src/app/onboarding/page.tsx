@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   ListPlus,
-  Zap,
   RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,30 +41,52 @@ export default function OnboardingPage() {
   const [customIndustry, setCustomIndustry] = useState("");
   const [whatsappPhone, setWhatsappPhone] = useState("+57 311 000 0000");
   const [services, setServices] = useState(
-    "1. Asesoría inicial y diagnóstico\n2. Servicio estándar de atención\n3. Consultoría avanzada personalizada"
+    "1. Asesoría inicial y diagnóstico\n2. Servicio estándar de atención\n3. Consultoría personalizada"
   );
-  const [schedule, setSchedule] = useState("Lunes a Viernes: 8:00 AM - 6:00 PM\nSábados: 9:00 AM - 1:00 PM");
+  const [schedule, setSchedule] = useState(
+    "Lunes a Viernes: 8:00 AM - 6:00 PM\nSábados: 9:00 AM - 1:00 PM"
+  );
   const [agentName, setAgentName] = useState("Asistente Virtual");
   const [tone, setTone] = useState("Profesional, cálido y resolutivo");
-  const [cancellationPolicy, setCancellationPolicy] = useState("Cancelar con mínimo 2 horas de anticipación");
+  const [cancellationPolicy, setCancellationPolicy] = useState(
+    "Cancelar o reprogramar con mínimo 2 horas de anticipación"
+  );
   const [generatedPrompt, setGeneratedPrompt] = useState("");
 
-  const effectiveIndustry = industry === "Otro" ? customIndustry.trim() || "Servicios Profesionales" : industry;
+  const effectiveIndustry =
+    industry === "Otro" ? customIndustry.trim() || "Servicios Profesionales" : industry;
 
   const applyIndustryDefaults = (ind: string) => {
     const lower = ind.toLowerCase();
     if (lower.includes("legal") || lower.includes("jurídic")) {
       setAgentName("Martín");
-      setServices("1. Revisión y redacción de contratos\n2. Diagnóstico de litigio corporativo\n3. Asesoría laboral y societaria");
-    } else if (lower.includes("tech") || lower.includes("cloud") || lower.includes("sistemas") || lower.includes("software")) {
+      setServices(
+        "1. Revisión y redacción de contratos\n2. Diagnóstico jurídico\n3. Asesoría laboral y societaria"
+      );
+    } else if (
+      lower.includes("tech") ||
+      lower.includes("cloud") ||
+      lower.includes("sistemas") ||
+      lower.includes("software")
+    ) {
       setAgentName("Alex");
-      setServices("1. Discovery Call de arquitectura cloud\n2. Auditoría DevSecOps y Kubernetes\n3. Consultoría e implementación SaaS");
-    } else if (lower.includes("spa") || lower.includes("bienestar") || lower.includes("belleza")) {
+      setServices(
+        "1. Sesión de diagnóstico tecnológico\n2. Soporte y consultoría de proyectos\n3. Implementación de soluciones digitales"
+      );
+    } else if (
+      lower.includes("spa") ||
+      lower.includes("bienestar") ||
+      lower.includes("belleza")
+    ) {
       setAgentName("Camila");
-      setServices("1. Masaje relajante y descontracturante\n2. Circuito de hidroterapia termal\n3. Tratamiento facial rejuvenecedor");
+      setServices(
+        "1. Masaje relajante y descontracturante\n2. Circuito de hidroterapia termal\n3. Tratamiento facial rejuvenecedor"
+      );
     } else if (lower.includes("dental") || lower.includes("salud") || lower.includes("médic")) {
       setAgentName("Sofía");
-      setServices("1. Consulta Odontológica General\n2. Limpieza Dental con Ultrasonido\n3. Valoración de Ortodoncia");
+      setServices(
+        "1. Valoración Odontológica General\n2. Limpieza Dental Profesional\n3. Valoración de Ortodoncia"
+      );
     }
   };
 
@@ -83,7 +104,6 @@ export default function OnboardingPage() {
       applyIndustryDefaults(savedIndustry);
     }
 
-    // Also load from PostgreSQL backend if authenticated
     const fetchBackendData = async () => {
       try {
         const [orgData, agentData] = await Promise.all([
@@ -111,7 +131,8 @@ export default function OnboardingPage() {
               setCustomIndustry(dbInd);
             }
           }
-          if (typeof ans.whatsappPhone === "string" && ans.whatsappPhone) setWhatsappPhone(ans.whatsappPhone);
+          if (typeof ans.whatsappPhone === "string" && ans.whatsappPhone)
+            setWhatsappPhone(ans.whatsappPhone);
           if (typeof ans.services === "string" && ans.services) setServices(ans.services);
           if (typeof ans.schedule === "string" && ans.schedule) setSchedule(ans.schedule);
           if (typeof ans.agentName === "string" && ans.agentName) setAgentName(ans.agentName);
@@ -134,23 +155,23 @@ export default function OnboardingPage() {
   const handleGeneratePrompt = async () => {
     setIsGenerating(true);
 
-    const compiledPrompt = `Eres ${agentName}, la asistente virtual inteligente de ${companyName || "la empresa"}.
-Tu rol es atender a los clientes por WhatsApp, responder dudas sobre los servicios y agendar citas o reuniones en Google Calendar de forma autónoma.
+    const compiledPrompt = `Eres ${agentName}, el asistente virtual de ${companyName || "nuestro negocio"}.
+Tu objetivo es atender a los clientes por WhatsApp, responder sus dudas sobre nuestros servicios y agendar sus citas en Google Calendar de forma amable y ordenada.
 
 Sector: ${effectiveIndustry}
-Tono y personalidad: ${tone}
+Tono y trato: ${tone}
 
-Catálogo de Servicios:
+Servicios disponibles:
 ${services}
 
-Horarios de Atención:
+Horarios de atención:
 ${schedule}
 
-Políticas y Reglas:
+Políticas de atención:
 - ${cancellationPolicy}
-- Consulta SIEMPRE la disponibilidad mediante la herramienta 'check_availability' antes de proponer horas al cliente.
-- Una vez el cliente confirme el horario y sus datos, usa 'book_appointment' para separar el cupo oficial en Google Calendar.
-- Si el cliente tiene una duda fuera de alcance, sé honesta y ofrece comunicar con un asesor humano.`;
+- Revisa siempre la disponibilidad en el calendario antes de proponer horarios al cliente.
+- Una vez el cliente confirme el horario y sus datos de contacto, registra la cita en Google Calendar.
+- Si el cliente tiene una consulta especial, ofrece comunicarlo con una persona de nuestro equipo.`;
 
     try {
       await apiFetch("/agents/me/onboarding", {
@@ -229,14 +250,17 @@ Políticas y Reglas:
       <div className="max-w-2xl mx-auto w-full space-y-6">
         {/* Header and Step Indicator */}
         <div className="text-center space-y-2">
-          <Badge variant="outline" className="text-xs bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800">
+          <Badge
+            variant="outline"
+            className="text-xs bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+          >
             Paso {step} de 4
           </Badge>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Configura tu Agente Inteligente de WhatsApp
+            Personaliza el Asistente de tu Negocio
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-            Zolution ensambla el prompt del sistema y guarda la configuración de tu empresa en PostgreSQL.
+            Cuéntanos sobre tu negocio para que tu asistente atienda clientes y agende citas como parte de tu equipo.
           </p>
 
           {/* Progress bar */}
@@ -248,36 +272,36 @@ Políticas y Reglas:
           </div>
         </div>
 
-        <Card className="border-zinc-200/80 dark:border-zinc-800 shadow-xl">
+        <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-lg">
           {/* Step 1: Business Profile */}
           {step === 1 && (
             <>
               <CardHeader>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-indigo-500" />
-                  Paso 1: Perfil de tu Negocio
+                  Paso 1: Datos de tu Negocio
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Información básica de tu empresa que el asistente utilizará para presentarse.
+                  Información básica con la que tu asistente saludará a tus clientes.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Nombre de la Empresa o Negocio
+                    Nombre de tu Negocio o Empresa
                   </label>
                   <Input
                     required
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Ej. Nova Consultores, Estudio Dental, AutoTech..."
+                    placeholder="Ej. Clínica Santa María, Nova Consultores..."
                     className="h-9 text-xs"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Industria / Sector
+                    Sector o Actividad
                   </label>
                   <select
                     value={industry}
@@ -294,20 +318,20 @@ Políticas y Reglas:
                         {ind}
                       </option>
                     ))}
-                    <option value="Otro">Otro (Especificar sector o gremio)</option>
+                    <option value="Otro">Otro (Especificar sector)</option>
                   </select>
                 </div>
 
                 {industry === "Otro" && (
-                  <div className="space-y-1 animate-in fade-in duration-200">
+                  <div className="space-y-1">
                     <label className="font-medium text-indigo-600 dark:text-indigo-400">
-                      ¿Cuál es el sector o actividad de tu negocio?
+                      ¿A qué se dedica tu negocio?
                     </label>
                     <Input
                       required
                       value={customIndustry}
                       onChange={(e) => setCustomIndustry(e.target.value)}
-                      placeholder="Ej. Veterinaria, Inmobiliaria, Academia de Idiomas, Restaurante..."
+                      placeholder="Ej. Veterinaria, Inmobiliaria, Academia, Restaurante..."
                       className="h-9 text-xs border-indigo-300 dark:border-indigo-800"
                     />
                   </div>
@@ -315,7 +339,7 @@ Políticas y Reglas:
 
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Teléfono Oficial de WhatsApp
+                    Teléfono de WhatsApp
                   </label>
                   <Input
                     value={whatsappPhone}
@@ -329,7 +353,7 @@ Políticas y Reglas:
                   <Button
                     onClick={() => setStep(2)}
                     disabled={!companyName.trim() || (industry === "Otro" && !customIndustry.trim())}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
                   >
                     Siguiente: Servicios y Horarios
                     <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -348,13 +372,13 @@ Políticas y Reglas:
                   Paso 2: Servicios y Horarios de Atención
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Especifica lo que ofrece tu negocio y los horarios disponibles para citas.
+                  Indica qué servicios ofreces y en qué horarios atiendes citas.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Catálogo de Servicios y Precios Orientativos
+                    Servicios Principales
                   </label>
                   <Textarea
                     rows={4}
@@ -366,7 +390,7 @@ Políticas y Reglas:
 
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Días y Horarios de Atención al Cliente
+                    Días y Horarios de Atención
                   </label>
                   <Textarea
                     rows={3}
@@ -377,12 +401,19 @@ Políticas y Reglas:
                 </div>
 
                 <div className="pt-2 flex justify-between">
-                  <Button variant="outline" onClick={() => setStep(1)} className="text-xs h-9">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep(1)}
+                    className="text-xs h-9 cursor-pointer"
+                  >
                     <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                     Atrás
                   </Button>
-                  <Button onClick={() => setStep(3)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9">
-                    Siguiente: Personalidad del Agente
+                  <Button
+                    onClick={() => setStep(3)}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
+                  >
+                    Siguiente: Estilo de Atención
                     <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -396,17 +427,17 @@ Políticas y Reglas:
               <CardHeader>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Bot className="h-5 w-5 text-indigo-500" />
-                  Paso 3: Personalidad del Agente y Políticas
+                  Paso 3: Estilo de Atención
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Define cómo se llamará el asistente y el tono de comunicación con los clientes.
+                  Elige el nombre de tu asistente y cómo quieres que trate a tus clientes.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Nombre del Asistente
+                      Nombre de tu Asistente
                     </label>
                     <Input
                       value={agentName}
@@ -418,12 +449,12 @@ Políticas y Reglas:
 
                   <div className="space-y-1">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Tono de Conversación
+                      Trato con el Cliente
                     </label>
                     <Input
                       value={tone}
                       onChange={(e) => setTone(e.target.value)}
-                      placeholder="Ej. Cercano, formal, dinámico..."
+                      placeholder="Ej. Cercano, formal, amable..."
                       className="h-9 text-xs"
                     />
                   </div>
@@ -431,7 +462,7 @@ Políticas y Reglas:
 
                 <div className="space-y-1">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Políticas de Citas y Cancelación
+                    Reglas para Citas o Cancelaciones
                   </label>
                   <Input
                     value={cancellationPolicy}
@@ -441,17 +472,21 @@ Políticas y Reglas:
                 </div>
 
                 <div className="pt-2 flex justify-between">
-                  <Button variant="outline" onClick={() => setStep(2)} className="text-xs h-9">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep(2)}
+                    className="text-xs h-9 cursor-pointer"
+                  >
                     <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                     Atrás
                   </Button>
                   <Button
                     onClick={handleGeneratePrompt}
                     disabled={isGenerating}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
                   >
                     <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    {isGenerating ? "Guardando y Generando..." : "Sintetizar Prompt del Agente"}
+                    {isGenerating ? "Preparando Asistente..." : "Crear Instrucciones"}
                   </Button>
                 </div>
               </CardContent>
@@ -465,14 +500,14 @@ Políticas y Reglas:
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ¡Prompt del Agente Ensamblado Exitosamente!
+                    ¡Tu Asistente está Listo!
                   </CardTitle>
                   <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs">
-                    Sincronizado en BD
+                    Configurado
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
-                  Este es el conjunto de instrucciones del sistema que guiará el comportamiento del LLM en cada conversación turn-by-turn.
+                  Revisa o ajusta la guía de atención que seguirá tu asistente con cada cliente.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
@@ -480,37 +515,41 @@ Políticas y Reglas:
                   rows={10}
                   value={generatedPrompt}
                   onChange={(e) => setGeneratedPrompt(e.target.value)}
-                  className="font-mono text-xs leading-relaxed bg-zinc-50 dark:bg-zinc-900 resize-y"
+                  className="text-xs leading-relaxed bg-zinc-50 dark:bg-zinc-900 resize-y"
                 />
 
-                <div className="p-3 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 space-y-1">
+                <div className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 space-y-1">
                   <p className="font-semibold flex items-center gap-1.5">
-                    <Zap className="h-3.5 w-3.5 text-emerald-600" />
-                    Function Calling Habilitado
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    Agenda Conectada
                   </p>
                   <p className="text-[11px] leading-relaxed">
-                    Las herramientas <code>check_availability</code> y <code>book_appointment</code> han sido vinculadas automáticamente a este agente.
+                    Tu agente gestiona citas y responde dudas directamente desde el calendario de tu negocio.
                   </p>
                 </div>
 
                 <div className="pt-2 flex justify-between">
-                  <Button variant="outline" onClick={() => setStep(3)} className="text-xs h-9">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep(3)}
+                    className="text-xs h-9 cursor-pointer"
+                  >
                     <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                    Ajustar Parámetros
+                    Volver
                   </Button>
                   <Button
                     onClick={handleFinishOnboarding}
                     disabled={isSavingFinish}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
                   >
                     {isSavingFinish ? (
                       <>
                         <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Guardando en PostgreSQL...
+                        Guardando...
                       </>
                     ) : (
                       <>
-                        Guardar y Abrir Panel
+                        Ir al Resumen
                         <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                       </>
                     )}

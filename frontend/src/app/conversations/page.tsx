@@ -6,24 +6,31 @@ import {
   Bot,
   User,
   Clock,
-  Sparkles,
+  CheckCircle2,
   Phone,
   RefreshCw,
-  Wifi,
-  WifiOff,
   MessageSquare,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
-import { getTenantContext, getTenantConversations, ConversationSummary, TenantContext } from "@/lib/tenant";
+import {
+  getTenantContext,
+  getTenantConversations,
+  getAppLanguage,
+  formatToolLabel,
+  ConversationSummary,
+  TenantContext,
+  AppLanguage,
+} from "@/lib/tenant";
 
 export default function ConversationsPage() {
+  const [lang, setLang] = useState<AppLanguage>("es");
   const [tenant, setTenant] = useState<TenantContext>({
     id: "dra-garcia-dental",
     slug: "dra-garcia-dental",
-    name: "Cargando empresa...",
+    name: "Mi Negocio",
     industry: "Servicios",
     email: "admin@zolution.ai",
   });
@@ -36,7 +43,9 @@ export default function ConversationsPage() {
   const loadConversations = async () => {
     setIsLoading(true);
     const ctx = getTenantContext();
+    const currentLang = getAppLanguage();
     setTenant(ctx);
+    setLang(currentLang);
 
     const initialDemos = getTenantConversations(ctx.name, ctx.industry);
 
@@ -59,14 +68,16 @@ export default function ConversationsPage() {
           customerName: item.customer_name || "Cliente WhatsApp",
           phone: item.customer_phone,
           lastMessage: item.last_message?.content || "Sin mensajes",
-          time: new Date(item.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          time: new Date(item.updated_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
           status: item.status,
           messages: [],
         }));
         setConversations(mapped);
         setIsLiveApi(true);
 
-        // Fetch full messages of the first conversation immediately
         try {
           const firstDetail = await apiFetch<{
             messages: Array<{
@@ -81,7 +92,10 @@ export default function ConversationsPage() {
               id: m.id,
               role: m.role,
               content: m.content,
-              time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              time: new Date(m.created_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
             }));
           }
         } catch {
@@ -89,7 +103,6 @@ export default function ConversationsPage() {
         }
         setSelectedConv({ ...mapped[0] });
       } else {
-        // Use tenant-specific dynamic demo conversation
         setConversations(initialDemos);
         setSelectedConv(initialDemos[0] || null);
         setIsLiveApi(false);
@@ -127,7 +140,10 @@ export default function ConversationsPage() {
             id: m.id,
             role: m.role,
             content: m.content,
-            time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            time: new Date(m.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
           }));
           setSelectedConv((prev) => (prev ? { ...prev, messages: formattedMessages } : null));
         }
@@ -147,65 +163,53 @@ export default function ConversationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Historial de Conversaciones · {tenant.name}</h2>
+          <h2 className="text-2xl font-bold tracking-tight">
+            {lang === "en" ? `Conversations · ${tenant.name}` : `Conversaciones · ${tenant.name}`}
+          </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Supervisa los chats atendidos automáticamente por tu agente de IA en WhatsApp para {tenant.name}.
+            {lang === "en"
+              ? `Review the chats answered automatically by your assistant on WhatsApp for ${tenant.name}.`
+              : `Revisa los chats atendidos por tu asistente en WhatsApp para ${tenant.name}.`}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <Badge
-            variant="outline"
-            className={`text-xs gap-1.5 py-1 ${
-              isLiveApi
-                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-            }`}
-          >
-            {isLiveApi ? (
-              <>
-                <Wifi className="h-3 w-3 text-emerald-500" />
-                Backend Live API
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3 w-3 text-zinc-400" />
-                Modo Demo Local ({tenant.industry})
-              </>
-            )}
-          </Badge>
-
           <Button
             size="sm"
             variant="outline"
             onClick={loadConversations}
             disabled={isLoading}
-            className="text-xs h-8"
+            className="text-xs h-8 cursor-pointer"
           >
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            Actualizar
+            {lang === "en" ? "Refresh" : "Actualizar"}
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[720px]">
         {/* Left Column: Conversation list */}
-        <div className="lg:col-span-5 flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs overflow-hidden">
+        <div className="lg:col-span-5 flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs overflow-hidden">
           <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
               <Input
-                placeholder="Buscar cliente o teléfono..."
+                placeholder={
+                  lang === "en" ? "Search customer or phone..." : "Buscar cliente o teléfono..."
+                }
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 h-9 text-xs sm:text-sm"
               />
             </div>
             <div className="flex items-center justify-between text-xs text-zinc-500">
-              <span>{filteredConversations.length} conversaciones</span>
-              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                WhatsApp Live
+              <span>
+                {filteredConversations.length}{" "}
+                {lang === "en" ? "conversations" : "conversaciones"}
+              </span>
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                {lang === "en" ? "WhatsApp Connected" : "WhatsApp Conectado"}
               </span>
             </div>
           </div>
@@ -214,7 +218,11 @@ export default function ConversationsPage() {
             {filteredConversations.length === 0 ? (
               <div className="p-8 text-center text-zinc-400 space-y-2">
                 <MessageSquare className="w-8 h-8 mx-auto text-zinc-300" />
-                <p className="text-xs">No hay conversaciones registradas para {tenant.name}.</p>
+                <p className="text-xs">
+                  {lang === "en"
+                    ? `No conversations found for ${tenant.name}.`
+                    : `No hay conversaciones registradas para ${tenant.name}.`}
+                </p>
               </div>
             ) : (
               filteredConversations.map((conv) => {
@@ -223,11 +231,13 @@ export default function ConversationsPage() {
                   <button
                     key={conv.id}
                     onClick={() => handleSelectConversation(conv)}
-                    className={`w-full text-left p-4 transition-colors flex items-start gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
-                      isSelected ? "bg-indigo-50/60 dark:bg-indigo-950/40 border-l-4 border-indigo-600" : ""
+                    className={`w-full text-left p-4 transition-colors flex items-start gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer ${
+                      isSelected
+                        ? "bg-indigo-50/50 dark:bg-indigo-950/30 border-l-4 border-indigo-600"
+                        : ""
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
                       {conv.customerName.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -250,11 +260,11 @@ export default function ConversationsPage() {
         </div>
 
         {/* Right Column: Active Conversation Viewer */}
-        <div className="lg:col-span-7 flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs overflow-hidden">
+        <div className="lg:col-span-7 flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs overflow-hidden">
           {selectedConv ? (
             <>
               {/* Chat Header */}
-              <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/40">
+              <div className="p-4 border-b border-zinc-200/70 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/40 dark:bg-zinc-800/30">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
                     {selectedConv.customerName.slice(0, 2).toUpperCase()}
@@ -270,8 +280,11 @@ export default function ConversationsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200 dark:border-emerald-800">
-                    Resuelto por IA
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200 dark:border-emerald-800"
+                  >
+                    {lang === "en" ? "Answered by Agent" : "Atendido por tu Agente"}
                   </Badge>
                 </div>
               </div>
@@ -292,11 +305,15 @@ export default function ConversationsPage() {
                             : "bg-indigo-600 text-white"
                         }`}
                       >
-                        {msg.role === "user" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                        {msg.role === "user" ? (
+                          <User className="h-3.5 w-3.5" />
+                        ) : (
+                          <Bot className="h-3.5 w-3.5" />
+                        )}
                       </div>
 
                       <div
-                        className={`p-3.5 rounded-2xl text-xs sm:text-sm max-w-[80%] leading-relaxed shadow-xs ${
+                        className={`p-3.5 rounded-2xl text-xs sm:text-sm max-w-[80%] leading-relaxed shadow-2xs ${
                           msg.role === "user"
                             ? "bg-indigo-600 text-white rounded-tr-none"
                             : "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-700/60 rounded-tl-none"
@@ -314,11 +331,11 @@ export default function ConversationsPage() {
                       </div>
                     </div>
 
-                    {/* Function calling indicator badge */}
+                    {/* Natural Language Action Indicator */}
                     {msg.toolCall && (
-                      <div className="ml-10 flex items-center gap-2 text-[11px] text-indigo-600 dark:text-indigo-400 font-mono bg-indigo-50 dark:bg-indigo-950/40 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900/40 w-fit">
-                        <Sparkles className="h-3 w-3 shrink-0" />
-                        <span>Tool ejecutada: {msg.toolCall}</span>
+                      <div className="ml-10 flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-50/80 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200/60 dark:border-emerald-900/50 w-fit">
+                        <CheckCircle2 className="h-3 w-3 shrink-0" />
+                        <span>{formatToolLabel(msg.toolCall, lang)}</span>
                       </div>
                     )}
                   </div>
@@ -326,14 +343,26 @@ export default function ConversationsPage() {
               </div>
 
               {/* Bottom Footer Note */}
-              <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-center text-xs text-zinc-500">
-                Mensajes entrantes sincronizados automáticamente para <strong>{tenant.name}</strong>.
+              <div className="p-3 border-t border-zinc-200/70 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/60 text-center text-xs text-zinc-500">
+                {lang === "en" ? (
+                  <>
+                    Messages synced automatically for <strong>{tenant.name}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Mensajes sincronizados automáticamente para <strong>{tenant.name}</strong>.
+                  </>
+                )}
               </div>
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-400 space-y-3">
               <MessageSquare className="w-10 h-10 text-zinc-300 dark:text-zinc-700" />
-              <p className="text-sm font-medium">Selecciona una conversación para ver los detalles.</p>
+              <p className="text-sm font-medium">
+                {lang === "en"
+                  ? "Select a conversation to view details."
+                  : "Selecciona una conversación para ver los detalles."}
+              </p>
             </div>
           )}
         </div>

@@ -12,44 +12,78 @@ import {
   Settings,
   Menu,
   X,
-  Sparkles,
   Sun,
   Moon,
   ChevronRight,
   ShieldCheck,
   LogOut,
+  Globe,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
+import { AppLanguage, getAppLanguage } from "@/lib/tenant";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
-
-const navigation = [
-  { name: "Overview", href: "/", icon: LayoutDashboard },
-  { name: "Agent Config", href: "/agent", icon: Bot, badge: "AI" },
-  { name: "Conversations", href: "/conversations", icon: MessageSquare },
-  { name: "Appointments", href: "/appointments", icon: Calendar },
-  { name: "Integrations", href: "/integrations", icon: Cable },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [orgName, setOrgName] = useState<string>("Mi Empresa");
-  const [orgIndustry, setOrgIndustry] = useState<string>("Organización Activa");
+  const [lang, setLang] = useState<AppLanguage>("es");
+  const [orgName, setOrgName] = useState<string>("Mi Negocio");
+  const [orgIndustry, setOrgIndustry] = useState<string>("Cuenta Activa");
   const [userEmail, setUserEmail] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
   const [userPicture, setUserPicture] = useState<string>("");
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
+  const navigation = [
+    {
+      name: lang === "en" ? "Overview" : "Resumen",
+      href: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      name: lang === "en" ? "My Agent" : "Mi Agente",
+      href: "/agent",
+      icon: Bot,
+      badge: "IA",
+    },
+    {
+      name: lang === "en" ? "Conversations" : "Conversaciones",
+      href: "/conversations",
+      icon: MessageSquare,
+    },
+    {
+      name: lang === "en" ? "Appointments" : "Citas",
+      href: "/appointments",
+      icon: Calendar,
+    },
+    {
+      name: lang === "en" ? "Connections" : "Conexiones",
+      href: "/integrations",
+      icon: Cable,
+    },
+    {
+      name: lang === "en" ? "Settings" : "Ajustes",
+      href: "/settings",
+      icon: Settings,
+    },
+  ];
+
+  const currentBreadcrumb = () => {
+    const found = navigation.find((item) => item.href === pathname);
+    if (found) return found.name;
+    if (pathname === "/onboarding") {
+      return lang === "en" ? "Initial Setup" : "Configuración Inicial";
+    }
+    return lang === "en" ? "Overview" : "Resumen";
+  };
+
   useEffect(() => {
-    // Check initial system or local theme
     const isDark =
       document.documentElement.classList.contains("dark") ||
       window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -58,7 +92,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       setIsDarkMode(true);
     }
 
-    // Auth Guard: If not on /login, check if user has active session
     if (pathname !== "/login") {
       const token =
         localStorage.getItem("zolution_token") ||
@@ -82,12 +115,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       if (savedEmail) setUserEmail(savedEmail);
       if (savedUserName) setUserName(savedUserName);
       if (savedPicture) setUserPicture(savedPicture);
+      setLang(getAppLanguage());
     };
 
     loadTenant();
     setIsAuthChecked(true);
 
-    // Sync tenant metadata from PostgreSQL on active session
     if (pathname !== "/login") {
       const authTok =
         localStorage.getItem("zolution_token") || localStorage.getItem("zolution_auth_token");
@@ -132,6 +165,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => window.removeEventListener("storage", loadTenant);
   }, [pathname, router]);
 
+  const toggleLanguage = () => {
+    const nextLang: AppLanguage = lang === "es" ? "en" : "es";
+    localStorage.setItem("zolution_lang", nextLang);
+    setLang(nextLang);
+    window.dispatchEvent(new Event("storage"));
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("zolution_token");
     localStorage.removeItem("zolution_auth_token");
@@ -158,41 +198,50 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   };
 
-  // If on login page, render full screen without dashboard sidebar or header
   if (pathname === "/login") {
     return <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950">{children}</main>;
   }
 
-  // If waiting for auth check on protected pages, show a minimalist subtle loader
   if (!isAuthChecked) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold animate-pulse shadow-md shadow-indigo-500/20">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold animate-pulse shadow-sm">
             Z
           </div>
-          <span className="text-xs text-zinc-400 font-medium">Verificando sesión...</span>
+          <span className="text-xs text-zinc-400 font-medium">
+            {lang === "en" ? "Loading your workspace..." : "Cargando tu espacio..."}
+          </span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col md:flex-row transition-colors duration-200">
+    <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col md:flex-row transition-colors duration-200">
       {/* Mobile Top Header */}
-      <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+      <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-500/20">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-xs">
             Z
           </div>
           <span className="font-semibold text-lg tracking-tight">Zolution</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleLanguage}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title={lang === "en" ? "Cambiar a Español" : "Switch to English"}
+          >
+            <Globe className="w-3.5 h-3.5 text-zinc-500" />
+            <span>{lang.toUpperCase()}</span>
+          </button>
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
-            aria-label="Toggle theme"
+            aria-label="Alternar tema"
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
@@ -200,7 +249,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             variant="ghost"
             size="icon"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
+            aria-label="Abrir menú"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
@@ -209,45 +258,47 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar for Desktop & Mobile drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200/80 dark:border-zinc-800/80 flex flex-col transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Brand Logo & Organization */}
-        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex flex-col gap-3">
+        {/* Brand Logo & Business Card */}
+        <div className="p-5 border-b border-zinc-100 dark:border-zinc-800/80 flex flex-col gap-3.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-extrabold shadow-lg shadow-indigo-500/25">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-extrabold shadow-xs">
                 Z
               </div>
               <div>
                 <h1 className="font-bold text-base leading-tight tracking-tight">Zolution</h1>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Universal Agentic AI</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {lang === "en" ? "Smart Assistant" : "Asistente Inteligente"}
+                </p>
               </div>
             </div>
-            <Badge variant="outline" className="text-[10px] font-mono border-indigo-200 dark:border-indigo-900/60 text-indigo-600 dark:text-indigo-400">
-              v1.0
-            </Badge>
           </div>
 
-          {/* Dynamic Tenant Selector Pill with link to switch company */}
           <Link
             href="/settings"
-            title="Clic para editar los ajustes de tu empresa"
-            className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200/70 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/50 transition-colors group cursor-pointer"
+            title={
+              lang === "en"
+                ? "Click to edit your business profile"
+                : "Clic para editar los datos de tu negocio"
+            }
+            className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100/80 dark:bg-zinc-800/40 dark:hover:bg-zinc-800/70 border border-zinc-200/60 dark:border-zinc-800 transition-colors group cursor-pointer"
           >
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
               <div className="truncate text-left">
-                <p className="text-xs font-semibold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <p className="text-xs font-semibold truncate text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                   {orgName}
                 </p>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
                   {orgIndustry}
                 </p>
               </div>
             </div>
-            <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           </Link>
         </div>
 
@@ -258,13 +309,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             const Icon = item.icon;
             return (
               <Link
-                key={item.name}
+                key={item.href}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                   isActive
-                    ? "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs"
-                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-100"
+                    ? "bg-indigo-50/90 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -278,7 +329,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-100/80 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
                     {item.badge}
                   </span>
                 )}
@@ -287,12 +338,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           })}
         </nav>
 
-        {/* Footer Area with Theme Toggle & Status */}
-        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+        {/* Footer Area with Theme Toggle & Logout */}
+        <div className="p-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
+          <div className="flex items-center gap-2 px-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
             <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-              RLS Secured
+              {lang === "en" ? "Protected Account" : "Cuenta Protegida"}
             </span>
           </div>
           <div className="flex items-center gap-1">
@@ -301,7 +352,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               size="icon"
               onClick={toggleTheme}
               className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-              title="Alternar tema"
+              title={lang === "en" ? "Toggle theme" : "Alternar tema"}
             >
               {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
@@ -310,7 +361,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               size="icon"
               onClick={handleLogout}
               className="h-8 w-8 text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400"
-              title="Cerrar sesión"
+              title={lang === "en" ? "Sign out" : "Cerrar sesión"}
             >
               <LogOut className="w-4 h-4" />
             </Button>
@@ -321,36 +372,56 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Desktop Top Bar */}
-        <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-20">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Panel</span>
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 capitalize">
-              {pathname === "/" ? "Overview" : pathname.replace("/", "")}
+        <header className="hidden md:flex items-center justify-between px-8 py-3.5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200/70 dark:border-zinc-800/70 sticky top-0 z-20">
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm font-medium text-zinc-400 dark:text-zinc-500">
+              {lang === "en" ? "Workspace" : "Panel"}
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600" />
+            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              {currentBreadcrumb()}
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              WhatsApp Webhook: Live
+            {/* Simple Visual Status Indicators */}
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100/80 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300 text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              {lang === "en" ? "WhatsApp: Connected" : "WhatsApp: Conectado"}
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-400 text-xs font-medium">
-              <Sparkles className="w-3.5 h-3.5" />
-              LLM Tool Calling: Active
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100/80 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300 text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              {lang === "en" ? "Agent: Active" : "Agente: Activo"}
             </div>
 
-            {/* Top-Tier User Profile Pill */}
+            {/* Global Language Selector (ES / EN) */}
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+              title={lang === "en" ? "Cambiar idioma a Español" : "Switch language to English"}
+            >
+              <Globe className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span className={lang === "es" ? "text-indigo-600 dark:text-indigo-400 font-bold" : "text-zinc-400"}>
+                ES
+              </span>
+              <span className="text-zinc-300 dark:text-zinc-700">/</span>
+              <span className={lang === "en" ? "text-indigo-600 dark:text-indigo-400 font-bold" : "text-zinc-400"}>
+                EN
+              </span>
+            </button>
+
+            {/* User Profile Pill */}
             {(userEmail || userName) && (
-              <div className="flex items-center gap-2 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2 pl-2 border-l border-zinc-200/80 dark:border-zinc-800">
                 {userPicture ? (
                   <img
                     src={userPicture}
                     alt={userName || userEmail}
-                    className="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover shadow-2xs"
+                    className="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center">
                     {(userName || userEmail || "U").charAt(0).toUpperCase()}
                   </div>
                 )}
