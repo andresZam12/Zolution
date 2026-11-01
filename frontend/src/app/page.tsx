@@ -107,41 +107,6 @@ export default function OverviewPage() {
     if (!simInput.trim() || simLoading) return;
 
     const userText = simInput.trim();
-    const lower = userText.toLowerCase();
-    let detectedTool = "Pregunta general";
-    let replyText =
-      lang === "en"
-        ? `At ${tenant.name} we are available to assist you and schedule your appointment whenever works best for you.`
-        : `En ${tenant.name} estamos atentos para ayudarte y agendar tu cita en el horario que mejor te convenga.`;
-
-    if (
-      lower.includes("cita") ||
-      lower.includes("disponib") ||
-      lower.includes("espacio") ||
-      lower.includes("horario") ||
-      lower.includes("appointment") ||
-      lower.includes("available")
-    ) {
-      detectedTool = "Consulta de disponibilidad";
-      replyText =
-        lang === "en"
-          ? `I just checked the calendar for ${tenant.name}. We have openings tomorrow at 10:00 AM and 3:30 PM. Would either work for you?`
-          : `Acabo de revisar el calendario de ${tenant.name}. Tenemos disponibilidad mañana a las 10:00 AM y a las 3:30 PM. ¿Te gustaría reservar alguno?`;
-    } else if (
-      lower.includes("10") ||
-      lower.includes("3") ||
-      lower.includes("reservar") ||
-      lower.includes("confirm") ||
-      lower.includes("agendar") ||
-      lower.includes("book")
-    ) {
-      detectedTool = "Cita agendada";
-      replyText =
-        lang === "en"
-          ? `Perfect! Your appointment has been scheduled in the calendar for ${tenant.name}. We look forward to seeing you!`
-          : `¡Perfecto! Tu cita ha quedado agendada en el calendario de ${tenant.name}. ¡Te esperamos!`;
-    }
-
     setSimMessages((prev) => [
       ...prev,
       { id: Date.now().toString(), role: "user", text: userText },
@@ -150,29 +115,40 @@ export default function OverviewPage() {
     setSimLoading(true);
 
     try {
-      await apiFetch("/conversations/simulate", {
-        method: "POST",
-        body: JSON.stringify({
-          customer_name: lang === "en" ? `Quick Test (${tenant.name})` : `Prueba Rápida (${tenant.name})`,
-          customer_phone: "Simulador",
-          user_message: userText,
-          assistant_reply: replyText,
-          tool_used: detectedTool,
-        }),
-      });
+      const res = await apiFetch<{ reply: string; tool_called?: string | null }>(
+        "/conversations/simulate",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            message: userText,
+            customer_name: lang === "en" ? "Quick Test" : "Prueba Rápida",
+            customer_phone: "+57 300 000 0001",
+          }),
+        }
+      );
       setConvCount((prev) => (prev !== null ? prev + 1 : null));
-    } catch {
-      // Fallback local preview
-    } finally {
       setSimMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          text: replyText,
-          actionLabel: formatToolLabel(detectedTool, lang),
+          text: res.reply,
+          actionLabel: res.tool_called ? formatToolLabel(res.tool_called, lang) : undefined,
         },
       ]);
+    } catch {
+      setSimMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          text:
+            lang === "en"
+              ? "⚠️ I couldn't reach the assistant right now. Please try again."
+              : "⚠️ No pude conectar con el asistente en este momento. Intenta de nuevo.",
+        },
+      ]);
+    } finally {
       setSimLoading(false);
     }
   };

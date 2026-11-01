@@ -186,37 +186,18 @@ export default function AgentConfigPage() {
         ...prev,
         { role: "assistant", content: simRes.reply, actionBadge: actionLabel },
       ]);
-    } catch {
-      let reply = `Entendido, en ${tenant.name} con gusto te ayudamos.`;
-      let actionBadge = formatToolLabel("llm_answer", lang);
-      const lower = userMsg.toLowerCase();
-      if (
-        lower.includes("cita") ||
-        lower.includes("hora") ||
-        lower.includes("reunión") ||
-        lower.includes("agendar") ||
-        lower.includes("disponib")
-      ) {
-        actionBadge = formatToolLabel("check_availability", lang);
-        reply = `Claro, permíteme revisar la agenda en Google Calendar... Para mañana tenemos espacio a las 10:00 AM y a las 3:30 PM. ¿Cuál horario te queda mejor?`;
-      } else if (
-        lower.includes("10") ||
-        lower.includes("3") ||
-        lower.includes("jueves") ||
-        lower.includes("perfecto") ||
-        lower.includes("sí")
-      ) {
-        actionBadge = formatToolLabel("book_appointment", lang);
-        reply = `¡Excelente! He agendado tu cita en el calendario de ${tenant.name}. Te llegará un recordatorio por WhatsApp un día antes. ¿Deseas consultar algo más?`;
-      } else if (
-        lower.includes("costo") ||
-        lower.includes("precio") ||
-        lower.includes("tarifa") ||
-        lower.includes("servicio")
-      ) {
-        reply = `En ${tenant.name} contamos con opciones adaptadas a tus necesidades. Con gusto podemos agendar una cita inicial para brindarte atención personalizada. ¿Te gustaría reservar un espacio?`;
-      }
-      setChatMessages((prev) => [...prev, { role: "assistant", content: reply, actionBadge }]);
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : "";
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            lang === "en"
+              ? `⚠️ I couldn't reach the assistant service right now. ${detail ? `(${detail})` : ""} Please try again in a few seconds.`
+              : `⚠️ No pude conectar con el servicio del asistente en este momento. ${detail ? `(${detail})` : ""} Intenta de nuevo en unos segundos.`,
+        },
+      ]);
     } finally {
       setIsSimulating(false);
     }
