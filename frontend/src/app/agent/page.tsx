@@ -32,6 +32,7 @@ interface SimMessage {
   role: string;
   content: string;
   actionBadge?: string;
+  providerBadge?: string;
 }
 
 export default function AgentConfigPage() {
@@ -183,19 +184,37 @@ export default function AgentConfigPage() {
         }),
       });
 
+      let providerLabel: string | undefined;
+      if (simRes.used_provider) {
+        if (simRes.used_provider.includes("google")) {
+          providerLabel = "Google Gemini";
+        } else if (simRes.used_provider.includes("anthropic")) {
+          providerLabel = "Claude (Anthropic)";
+        } else if (simRes.used_provider.includes("openai")) {
+          providerLabel = "OpenAI GPT";
+        } else {
+          providerLabel = simRes.used_provider;
+        }
+      }
+
       if (!simRes.used_provider && simRes.llm_errors && simRes.llm_errors.length > 0) {
         setChatMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: `⚠️ La IA no respondió (se usó respuesta básica). Motivo:\n- ${simRes.llm_errors!.join("\n- ")}`,
+            content: `⚠️ Los modelos LLM reportaron:\n- ${simRes.llm_errors!.join("\n- ")}`,
           },
         ]);
       }
       const actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
       setChatMessages((prev) => [
         ...prev,
-        { role: "assistant", content: simRes.reply, actionBadge: actionLabel },
+        {
+          role: "assistant",
+          content: simRes.reply,
+          actionBadge: actionLabel,
+          providerBadge: providerLabel,
+        },
       ]);
     } catch (err: unknown) {
       const detail = err instanceof Error ? err.message : "";
@@ -336,26 +355,33 @@ export default function AgentConfigPage() {
                     value={provider}
                     onChange={(e) => {
                       setProvider(e.target.value);
-                      if (e.target.value === "anthropic") setModel("claude-3-5-sonnet");
+                      if (e.target.value === "anthropic") setModel("claude-3-5-haiku-latest");
                       else if (e.target.value === "google") setModel("gemini-2.0-flash");
                       else setModel("gpt-4o-mini");
                     }}
                     className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
                   >
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic (Claude)</option>
-                    <option value="google">Google Gemini</option>
+                    <option value="openai">OpenAI (GPT-4o Mini)</option>
+                    <option value="google">Google Gemini (Gemini 2.0 Flash)</option>
+                    <option value="anthropic">Anthropic (Claude 3.5 Haiku)</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    {lang === "en" ? "Version" : "Versión"}
+                    {lang === "en" ? "Model / Version" : "Modelo / Versión"}
                   </label>
                   <Input
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="h-9 text-sm"
+                    placeholder={
+                      provider === "google"
+                        ? "gemini-2.0-flash"
+                        : provider === "anthropic"
+                        ? "claude-3-5-haiku-latest"
+                        : "gpt-4o-mini"
+                    }
+                    className="h-9 text-sm font-mono text-xs"
                   />
                 </div>
               </div>
@@ -431,12 +457,20 @@ export default function AgentConfigPage() {
               <div className="flex-1 min-h-[360px] max-h-[500px] overflow-y-auto space-y-3 p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800">
                 {chatMessages.map((msg, index) => (
                   <div key={index} className="space-y-1">
-                    {msg.actionBadge && (
-                      <div className="ml-9">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
-                          <CheckCircle2 className="h-2.5 w-2.5" />
-                          {msg.actionBadge}
-                        </span>
+                    {(msg.actionBadge || msg.providerBadge) && (
+                      <div className="ml-9 flex items-center gap-1.5 flex-wrap">
+                        {msg.actionBadge && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                            {msg.actionBadge}
+                          </span>
+                        )}
+                        {msg.providerBadge && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/50">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            {msg.providerBadge}
+                          </span>
+                        )}
                       </div>
                     )}
                     <div
