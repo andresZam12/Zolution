@@ -198,6 +198,9 @@ export default function AgentConfigPage() {
           if (err.includes("insufficient_quota") || err.includes("no credits")) {
             return "OpenAI sin créditos disponibles.";
           }
+          if (err.includes("429") || err.includes("quota") || err.includes("ResourceExhausted") || err.includes("RateLimit")) {
+            return "Google Gemini: Cuota temporal alcanzada (429). Espera 1 minuto o crea una nueva key en aistudio.google.com.";
+          }
           if (err.includes("anthropic-workspace-id") || err.includes("not scoped to a workspace")) {
             return "Anthropic requiere configurar Workspace ID.";
           }
