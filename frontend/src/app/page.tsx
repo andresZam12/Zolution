@@ -114,6 +114,8 @@ export default function OverviewPage() {
             message: userText,
             customer_name: lang === "en" ? "Quick Test" : "Prueba Rápida",
             customer_phone: "+57 300 000 0001",
+            llm_provider_override: "google",
+            llm_model_override: "gemini-3.8-flash",
           }),
         }
       );

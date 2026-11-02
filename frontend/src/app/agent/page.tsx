@@ -173,6 +173,8 @@ export default function AgentConfigPage() {
           customer_name: "Cliente Simulador WhatsApp",
           customer_phone: "+57 300 000 0000",
           system_prompt_override: prompt,
+          llm_provider_override: provider,
+          llm_model_override: model,
         }),
       });
 
