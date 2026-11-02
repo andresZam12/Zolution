@@ -221,7 +221,13 @@ export default function AgentConfigPage() {
         if (simRes.google_calendar_synced) {
           actionLabel = lang === "en" ? "📅 Booked in Google Calendar" : "📅 Cita creada en Google Calendar";
         } else {
-          actionLabel = lang === "en" ? "📝 Saved in Zolution (Calendar disconnected)" : "📝 Guardada en Zolution (Calendar sin conectar)";
+          actionLabel = lang === "en" ? "📝 Saved in Zolution (Calendar disconnected)" : "📝 Guardada en Zolution (Calendar sin sincronizar)";
+          const calErr = simRes.llm_errors?.find((e) => e.includes("Google Calendar"));
+          if (calErr) {
+            setLlmNotice(calErr);
+          } else {
+            setLlmNotice("Google Calendar no sincronizó. En la pantalla de Google debes marcar la casilla de verificación para dar acceso a tu calendario.");
+          }
         }
       }
       setChatMessages((prev) => [
