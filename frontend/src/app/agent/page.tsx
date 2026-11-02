@@ -165,6 +165,7 @@ export default function AgentConfigPage() {
         reply: string;
         tool_called?: string | null;
         appointment_created?: boolean;
+        google_calendar_synced?: boolean;
         used_provider?: string | null;
         llm_errors?: string[];
       }>("/conversations/simulate", {
@@ -215,7 +216,14 @@ export default function AgentConfigPage() {
         setLlmNotice(cleanedErrors[0] || null);
       }
 
-      const actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
+      let actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
+      if (simRes.appointment_created) {
+        if (simRes.google_calendar_synced) {
+          actionLabel = lang === "en" ? "📅 Booked in Google Calendar" : "📅 Cita creada en Google Calendar";
+        } else {
+          actionLabel = lang === "en" ? "📝 Saved in Zolution (Calendar disconnected)" : "📝 Guardada en Zolution (Calendar sin conectar)";
+        }
+      }
       setChatMessages((prev) => [
         ...prev,
         {
