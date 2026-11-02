@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Sliders,
   CheckCircle2,
+  AlertTriangle,
   Send,
   User,
   RefreshCw,
@@ -32,6 +33,7 @@ interface SimMessage {
   role: string;
   content: string;
   actionBadge?: string;
+  actionType?: "success" | "warning";
   providerBadge?: string;
 }
 
@@ -217,11 +219,14 @@ export default function AgentConfigPage() {
       }
 
       let actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
+      let actionType: "success" | "warning" = "success";
       if (simRes.appointment_created) {
         if (simRes.google_calendar_synced) {
           actionLabel = lang === "en" ? "📅 Booked in Google Calendar" : "📅 Cita creada en Google Calendar";
+          actionType = "success";
         } else {
-          actionLabel = lang === "en" ? "📝 Saved in Zolution (Calendar disconnected)" : "📝 Guardada en Zolution (Calendar sin sincronizar)";
+          actionLabel = lang === "en" ? "📝 Saved in Zolution (Calendar unsynced)" : "📝 Guardada en Zolution (Calendar sin sincronizar)";
+          actionType = "warning";
           const calErr = simRes.llm_errors?.find((e) => e.includes("Google Calendar"));
           if (calErr) {
             setLlmNotice(calErr);
@@ -236,6 +241,7 @@ export default function AgentConfigPage() {
           role: "assistant",
           content: simRes.reply,
           actionBadge: actionLabel,
+          actionType,
           providerBadge: providerLabel,
         },
       ]);
@@ -498,10 +504,17 @@ export default function AgentConfigPage() {
                     {(msg.actionBadge || msg.providerBadge) && (
                       <div className="ml-9 flex items-center gap-1.5 flex-wrap">
                         {msg.actionBadge && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
-                            <CheckCircle2 className="h-2.5 w-2.5" />
-                            {msg.actionBadge}
-                          </span>
+                          msg.actionType === "warning" ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/50">
+                              <AlertTriangle className="h-2.5 w-2.5" />
+                              {msg.actionBadge}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                              {msg.actionBadge}
+                            </span>
+                          )
                         )}
                         {msg.providerBadge && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/50">
