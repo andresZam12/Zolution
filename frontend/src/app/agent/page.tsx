@@ -57,6 +57,7 @@ export default function AgentConfigPage() {
   const [chatMessages, setChatMessages] = useState<SimMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
+  const [llmNotice, setLlmNotice] = useState<string | null>(null);
 
   const loadAgentConfig = async () => {
     const ctx = getTenantContext();
@@ -180,6 +181,7 @@ export default function AgentConfigPage() {
 
       let providerLabel: string | undefined;
       if (simRes.used_provider) {
+        setLlmNotice(null);
         if (simRes.used_provider.includes("google")) {
           providerLabel = "Google Gemini";
         } else if (simRes.used_provider.includes("anthropic")) {
@@ -194,25 +196,22 @@ export default function AgentConfigPage() {
       if (!simRes.used_provider && simRes.llm_errors && simRes.llm_errors.length > 0) {
         const cleanedErrors = simRes.llm_errors.map((err) => {
           if (err.includes("insufficient_quota") || err.includes("no credits")) {
-            return "OpenAI: Tu cuenta no tiene créditos o saldo disponible en platform.openai.com.";
+            return "OpenAI sin créditos disponibles.";
           }
           if (err.includes("anthropic-workspace-id") || err.includes("not scoped to a workspace")) {
-            return "Anthropic: Tu API key requiere configurar ANTHROPIC_WORKSPACE_ID o usar una key creada dentro de un Workspace.";
+            return "Anthropic requiere configurar Workspace ID.";
           }
           if (err.includes("no longer available") || err.includes("not found")) {
-            return "Google Gemini: Modelo no disponible en la versión configurada.";
+            return "Google Gemini: modelo alternado automáticamente.";
           }
-          return err.slice(0, 150);
+          if (err.includes("timed out") || err.includes("DeadlineExceeded")) {
+            return "El proveedor tardó demasiado en responder.";
+          }
+          return err.slice(0, 120);
         });
-
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: `ℹ️ Diagnóstico de conexión de IA:\n• ${cleanedErrors.join("\n• ")}`,
-          },
-        ]);
+        setLlmNotice(cleanedErrors[0] || null);
       }
+
       const actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
       setChatMessages((prev) => [
         ...prev,
@@ -534,6 +533,19 @@ export default function AgentConfigPage() {
                   </div>
                 )}
               </div>
+
+              {llmNotice && (
+                <div className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                  <span>ℹ️ {llmNotice}</span>
+                  <button
+                    type="button"
+                    onClick={() => setLlmNotice(null)}
+                    className="text-amber-500 hover:text-amber-800 ml-2"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {/* Chat Input */}
               <form
