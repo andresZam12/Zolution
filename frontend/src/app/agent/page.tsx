@@ -46,8 +46,8 @@ export default function AgentConfigPage() {
     industry: "Servicios",
     email: "admin@zolution.ai",
   });
-  const [provider, setProvider] = useState("openai");
-  const [model, setModel] = useState("gpt-4o-mini");
+  const [provider, setProvider] = useState("google");
+  const [model, setModel] = useState("gemini-3.8-flash");
   const [temperature, setTemperature] = useState(0.3);
   const [isActive, setIsActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -147,8 +147,6 @@ export default function AgentConfigPage() {
     }
   };
 
-  const [isEnrichingPrompt, setIsEnrichingPrompt] = useState(false);
-
   const handleResetToDefault = () => {
     const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry);
     setPrompt(freshPrompt);
@@ -166,24 +164,6 @@ export default function AgentConfigPage() {
     setSimulatorSessionId(newSession);
     setChatMessages([]);
     setLlmNotice(null);
-  };
-
-  const handleAIEnrichPrompt = () => {
-    setIsEnrichingPrompt(true);
-    try {
-      // Generar Master System Prompt imparcial y completo usando el motor de contexto
-      const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry, {
-        holidayPolicy: "Atención en días festivos solo hasta mediodía (8:00 AM - 1:00 PM)",
-        toleranceMinutes: 15,
-        cancellationNotice: "Avisar con al menos 2 horas de anticipación",
-      });
-      setPrompt(freshPrompt);
-      localStorage.setItem("zolution_agent_prompt", freshPrompt);
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
-    } finally {
-      setIsEnrichingPrompt(false);
-    }
   };
 
   const handleSendMessage = async () => {
@@ -389,19 +369,6 @@ export default function AgentConfigPage() {
                 <div className="flex items-center gap-2">
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAIEnrichPrompt}
-                    disabled={isEnrichingPrompt}
-                    className="text-xs h-7 gap-1 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer"
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 ${isEnrichingPrompt ? "animate-spin" : ""}`} />
-                    {isEnrichingPrompt
-                      ? (lang === "en" ? "Enriching..." : "Enriqueciendo...")
-                      : (lang === "en" ? "✨ AI Enrich" : "✨ Enriquecer con IA")}
-                  </Button>
-                  <Button
-                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={handleResetToDefault}
@@ -420,75 +387,27 @@ export default function AgentConfigPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Sliders className="h-4 w-4 text-indigo-500" />
-                {lang === "en" ? "Response Style & Capabilities" : "Estilo de Respuesta y Capacidades"}
+                {lang === "en" ? "Intelligence & Capabilities" : "Inteligencia y Capacidades Activas"}
               </CardTitle>
               <CardDescription className="text-xs">
                 {lang === "en"
-                  ? "Adjust the intelligence engine and automatic actions enabled for your business."
-                  : "Ajusta el motor de inteligencia y las acciones automáticas habilitadas para tu negocio."}
+                  ? "Configured engine and automatic capabilities running for your business."
+                  : "Motor configurado y acciones automáticas habilitadas para tu negocio."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    {lang === "en" ? "AI Engine" : "Motor de Inteligencia"}
-                  </label>
-                  <select
-                    value={provider}
-                    onChange={(e) => {
-                      setProvider(e.target.value);
-                      if (e.target.value === "anthropic") setModel("claude-3-5-haiku-latest");
-                      else if (e.target.value === "google") setModel("gemini-3.8-flash");
-                      else setModel("gpt-4o-mini");
-                    }}
-                    className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm"
-                  >
-                    <option value="google">Google Gemini (Gemini 3.8 Flash)</option>
-                    <option value="openai">OpenAI (GPT-4o Mini)</option>
-                    <option value="anthropic">Anthropic (Claude 3.5 Haiku)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    {lang === "en" ? "Model / Version" : "Modelo / Versión"}
-                  </label>
-                  <Input
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    placeholder={
-                      provider === "google"
-                        ? "gemini-3.8-flash"
-                        : provider === "anthropic"
-                        ? "claude-3-5-haiku-latest"
-                        : "gpt-4o-mini"
-                    }
-                    className="h-9 text-sm font-mono text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                    {lang === "en"
-                      ? `Flexibility / Tone Warmth: ${temperature}`
-                      : `Naturalidad de la conversación: ${temperature}`}
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider block">
+                    {lang === "en" ? "AI Core Engine" : "Motor de Inteligencia Activo"}
                   </span>
-                  <span className="text-zinc-400">
-                    {lang === "en" ? "Recommended: 0.2 - 0.4" : "Recomendado: 0.2 - 0.4"}
-                  </span>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mt-0.5">
+                    Google Gemini · Gemini 3.8 Flash
+                  </p>
                 </div>
-                <input
-                  type="range"
-                  min="0.0"
-                  max="1.0"
-                  step="0.05"
-                  value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                  className="w-full accent-indigo-600"
-                />
+                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border-0 text-xs">
+                  {lang === "en" ? "High Speed (< 1.5s)" : "Alta Velocidad (< 1.5s)"}
+                </Badge>
               </div>
 
               {/* Natural Language Capabilities */}
@@ -505,7 +424,7 @@ export default function AgentConfigPage() {
                   </div>
                   <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400">
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>{lang === "en" ? "Appointment booking" : "Cita agendada en calendario"}</span>
+                    <span>{lang === "en" ? "Google Calendar sync" : "Sincronización en Google Calendar"}</span>
                   </div>
                 </div>
               </div>
