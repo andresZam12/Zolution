@@ -157,7 +157,18 @@ export default function AgentConfigPage() {
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handleAIEnrichPrompt = async () => {
+  const [simulatorSessionId, setSimulatorSessionId] = useState<string>(() =>
+    typeof window !== "undefined" ? "sim_" + Math.random().toString(36).substring(2, 9) : "sim_default"
+  );
+
+  const handleResetChat = async () => {
+    const newSession = "sim_" + Math.random().toString(36).substring(2, 9);
+    setSimulatorSessionId(newSession);
+    setChatMessages([]);
+    setLlmNotice(null);
+  };
+
+  const handleAIEnrichPrompt = () => {
     setIsEnrichingPrompt(true);
     try {
       // Generar Master System Prompt imparcial y completo usando el motor de contexto
@@ -168,15 +179,6 @@ export default function AgentConfigPage() {
       });
       setPrompt(freshPrompt);
       localStorage.setItem("zolution_agent_prompt", freshPrompt);
-
-      // Guardar inmediatamente en el agente
-      await apiFetch("/agents/me", {
-        method: "PATCH",
-        body: JSON.stringify({
-          system_prompt_generated: freshPrompt,
-        }),
-      }).catch(() => null);
-
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     } finally {
@@ -205,8 +207,9 @@ export default function AgentConfigPage() {
         method: "POST",
         body: JSON.stringify({
           message: userMsg,
-          customer_name: "Cliente Simulador WhatsApp",
-          customer_phone: "+57 300 000 0000",
+          session_id: simulatorSessionId,
+          customer_name: "Cliente Simulador",
+          customer_phone: `+57-sim-${simulatorSessionId}`,
           system_prompt_override: prompt,
           llm_provider_override: provider,
           llm_model_override: model,
@@ -522,9 +525,20 @@ export default function AgentConfigPage() {
                       : `Prueba cómo responde tu asistente a los clientes de ${tenant.name}.`}
                   </CardDescription>
                 </div>
-                <Badge variant="secondary" className="text-[10px] bg-zinc-100 dark:bg-zinc-800">
-                  WhatsApp
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetChat}
+                    className="flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+                    title={lang === "en" ? "Start fresh conversation" : "Iniciar nueva conversación limpia"}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    {lang === "en" ? "New chat" : "Reiniciar chat"}
+                  </button>
+                  <Badge variant="secondary" className="text-[10px] bg-zinc-100 dark:bg-zinc-800">
+                    WhatsApp
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
 
