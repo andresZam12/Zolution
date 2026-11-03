@@ -12,6 +12,8 @@ import {
   Sparkles,
   RefreshCw,
   X,
+  Trash2,
+  Ban,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -212,6 +214,28 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleCancelAppointment = async (apt: ExtendedAppointmentItem) => {
+    const confirmMsg =
+      lang === "en"
+        ? "¿Are you sure you want to cancel this appointment? It will be removed from Google Calendar."
+        : "¿Seguro que deseas cancelar esta cita? Se desocupará y eliminará de Google Calendar.";
+    if (!window.confirm(confirmMsg)) return;
+
+    setAppointments((prev) =>
+      prev.map((item) => (item.id === apt.id ? { ...item, status: "cancelled" } : item))
+    );
+    if (isFromDb) {
+      try {
+        await apiFetch(`/appointments/${apt.id}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "cancelled" }),
+        });
+      } catch {
+        // Keep optimistic UI
+      }
+    }
+  };
+
   const filteredAppointments = appointments.filter((apt) =>
     filter === "all" ? true : apt.status === filter
   );
@@ -346,32 +370,54 @@ export default function AppointmentsPage() {
                     {apt.phone}
                   </CardDescription>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleToggleComplete(apt)}
-                  title={
-                    lang === "en"
-                      ? "Click to toggle status"
-                      : "Clic para cambiar estado (Confirmada / Completada)"
-                  }
-                >
-                  <Badge
-                    variant={apt.status === "confirmed" ? "default" : "secondary"}
-                    className={`text-[10px] uppercase font-bold tracking-wider cursor-pointer ${
-                      apt.status === "confirmed"
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                        : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-                    }`}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleComplete(apt)}
+                    title={
+                      lang === "en"
+                        ? "Click to toggle status"
+                        : "Clic para cambiar estado (Confirmada / Completada)"
+                    }
                   >
-                    {apt.status === "confirmed"
-                      ? lang === "en"
-                        ? "Confirmed"
-                        : "Confirmada"
-                      : lang === "en"
-                        ? "Completed"
-                        : "Completada"}
-                  </Badge>
-                </button>
+                    <Badge
+                      variant={apt.status === "confirmed" ? "default" : "secondary"}
+                      className={`text-[10px] uppercase font-bold tracking-wider cursor-pointer ${
+                        apt.status === "confirmed"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          : apt.status === "completed"
+                          ? "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+                          : "bg-rose-50 text-rose-600 dark:bg-rose-950/40 border border-rose-200"
+                      }`}
+                    >
+                      {apt.status === "confirmed"
+                        ? lang === "en"
+                          ? "Confirmed"
+                          : "Confirmada"
+                        : apt.status === "completed"
+                        ? lang === "en"
+                          ? "Completed"
+                          : "Completada"
+                        : lang === "en"
+                          ? "Cancelled"
+                          : "Cancelada"}
+                    </Badge>
+                  </button>
+                  {apt.status !== "cancelled" && (
+                    <button
+                      type="button"
+                      onClick={() => handleCancelAppointment(apt)}
+                      className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                      title={
+                        lang === "en"
+                          ? "Cancel appointment & remove from Google Calendar"
+                          : "Cancelar cita y eliminar de Google Calendar"
+                      }
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 text-xs">
@@ -388,11 +434,18 @@ export default function AppointmentsPage() {
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {lang === "en" ? "Synced with Calendar" : "Sincronizada en Agenda"}
-                </span>
-                {apt.htmlLink && (
+                {apt.status === "cancelled" ? (
+                  <span className="text-rose-500 font-medium flex items-center gap-1">
+                    <Ban className="h-3 w-3" />
+                    {lang === "en" ? "Cancelled from Calendar" : "Cancelada en Google Calendar"}
+                  </span>
+                ) : (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {lang === "en" ? "Synced with Calendar" : "Sincronizada en Agenda"}
+                  </span>
+                )}
+                {apt.htmlLink && apt.status !== "cancelled" && (
                   <a
                     href={apt.htmlLink}
                     target="_blank"

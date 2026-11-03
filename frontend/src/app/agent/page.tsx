@@ -238,7 +238,13 @@ export default function AgentConfigPage() {
 
       let actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
       let actionType: "success" | "warning" = "success";
-      if (simRes.appointment_created) {
+      if (simRes.tool_called?.includes("cancel_appointment")) {
+        actionLabel = lang === "en" ? "🗑️ Cancelled in Google Calendar" : "🗑️ Cita cancelada en Google Calendar";
+        actionType = "warning";
+      } else if (simRes.tool_called?.includes("reschedule_appointment")) {
+        actionLabel = lang === "en" ? "🔄 Rescheduled in Google Calendar" : "🔄 Cita actualizada en Google Calendar";
+        actionType = "success";
+      } else if (simRes.appointment_created) {
         if (simRes.google_calendar_synced) {
           actionLabel = lang === "en" ? "📅 Booked in Google Calendar" : "📅 Cita creada en Google Calendar";
           actionType = "success";

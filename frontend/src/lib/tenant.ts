@@ -17,6 +17,12 @@ export function getAppLanguage(): AppLanguage {
 
 export function formatToolLabel(tool: string, lang: AppLanguage = "es"): string {
   const clean = (tool || "").toLowerCase();
+  if (clean.includes("cancel_appointment") || clean.includes("cancel")) {
+    return lang === "en" ? "Appointment cancelled" : "Cita cancelada";
+  }
+  if (clean.includes("reschedule_appointment") || clean.includes("reprogram") || clean.includes("reschedule")) {
+    return lang === "en" ? "Appointment rescheduled" : "Cita reprogramada";
+  }
   if (clean.includes("book_appointment") || clean.includes("cita agendada") || clean.includes("appointment")) {
     return lang === "en" ? "Appointment booked" : "Cita agendada";
   }
