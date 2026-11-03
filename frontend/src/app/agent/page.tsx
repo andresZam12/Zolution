@@ -208,7 +208,11 @@ export default function AgentConfigPage() {
         body: JSON.stringify({
           message: userMsg,
           session_id: simulatorSessionId,
-          customer_name: "Cliente Simulador",
+          customer_name:
+            (typeof window !== "undefined" &&
+              (localStorage.getItem("zolution_user_name") ||
+                localStorage.getItem("zolution_user_email")?.split("@")[0])) ||
+            "Andrés",
           customer_phone: `+57-sim-${simulatorSessionId}`,
           system_prompt_override: prompt,
           llm_provider_override: provider,
