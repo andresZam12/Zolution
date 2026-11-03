@@ -147,10 +147,38 @@ export default function AgentConfigPage() {
     }
   };
 
+  const [isEnrichingPrompt, setIsEnrichingPrompt] = useState(false);
+
   const handleResetToDefault = () => {
     const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry);
     setPrompt(freshPrompt);
     localStorage.setItem("zolution_agent_prompt", freshPrompt);
+  };
+
+  const handleAIEnrichPrompt = async () => {
+    setIsEnrichingPrompt(true);
+    try {
+      const res = await apiFetch<{
+        recommended_system_prompt?: string;
+      }>("/agents/ai-enrich", {
+        method: "POST",
+        body: JSON.stringify({
+          business_name: tenant.name || "Mi Negocio",
+          industry: tenant.industry || "Servicios",
+          city_or_country: "Colombia",
+        }),
+      });
+      if (res?.recommended_system_prompt) {
+        setPrompt(res.recommended_system_prompt);
+        localStorage.setItem("zolution_agent_prompt", res.recommended_system_prompt);
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      }
+    } catch {
+      handleResetToDefault();
+    } finally {
+      setIsEnrichingPrompt(false);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -348,15 +376,31 @@ export default function AgentConfigPage() {
                     ? "Tip: Include your business hours and tone of voice."
                     : "Consejo: Incluye tus horarios de atención y el tono de trato que prefieras."}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleResetToDefault}
-                  className="text-xs h-7 text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                >
-                  <RotateCcw className="mr-1 h-3 w-3" />
-                  {lang === "en" ? "Restore suggested template" : "Restaurar plantilla sugerida"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAIEnrichPrompt}
+                    disabled={isEnrichingPrompt}
+                    className="text-xs h-7 gap-1 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${isEnrichingPrompt ? "animate-spin" : ""}`} />
+                    {isEnrichingPrompt
+                      ? (lang === "en" ? "Enriching..." : "Enriqueciendo...")
+                      : (lang === "en" ? "✨ AI Enrich" : "✨ Enriquecer con IA")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetToDefault}
+                    className="text-xs h-7 text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" />
+                    {lang === "en" ? "Restore suggested template" : "Restaurar plantilla sugerida"}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
