@@ -26,8 +26,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
 
+import { generateDefaultPrompt } from "@/lib/tenant";
+
 const PREDEFINED_INDUSTRIES = [
   "Servicios Profesionales y Consultoría",
+  "Tecnología, Software y Soporte Digital",
   "Comercio, Tienda y Retail",
   "Restaurantes, Cafés y Gastronomía",
   "Belleza, Peluquerías, Spas y Cuidado Personal",
@@ -35,14 +38,16 @@ const PREDEFINED_INDUSTRIES = [
   "Talleres, Mecánica y Mantenimiento",
   "Inmobiliaria y Bienes Raíces",
   "Educación, Cursos y Clases",
-  "Tecnología, Software y Soporte Digital",
   "Otro (Especificar libremente)",
 ];
 
-interface ServiceItemState {
+export type ServiceDurationUnit = "minutos" | "horas" | "días" | "semanas" | "meses" | "a convenir";
+
+export interface ServiceItemState {
   name: string;
   price_cop: number | string;
-  duration_minutes: number;
+  duration_value: number | string;
+  duration_unit: ServiceDurationUnit;
 }
 
 export default function OnboardingPage() {
@@ -59,23 +64,25 @@ export default function OnboardingPage() {
   const [cityOrCountry, setCityOrCountry] = useState("Colombia");
   const [whatsappPhone, setWhatsappPhone] = useState("");
 
-  // Paso 2: Servicios o Productos (Sin datos precargados de ningún sector específico)
+  // Paso 2: Servicios o Productos (Flexible en minutos, horas, días, semanas, meses o a convenir)
   const [serviceItems, setServiceItems] = useState<ServiceItemState[]>([
-    { name: "Atención o Asesoría Inicial", price_cop: "", duration_minutes: 45 },
+    { name: "Asesoría o Consulta Inicial", price_cop: "", duration_value: 45, duration_unit: "minutos" },
   ]);
   const [newServiceName, setNewServiceName] = useState("");
   const [newServicePrice, setNewServicePrice] = useState("");
-  const [newServiceDuration, setNewServiceDuration] = useState(45);
+  const [newServiceDurationValue, setNewServiceDurationValue] = useState<number | string>(1);
+  const [newServiceDurationUnit, setNewServiceDurationUnit] = useState<ServiceDurationUnit>("horas");
 
-  // Paso 3: Horarios, Festivos y Operación
+  // Paso 3: Modalidad, Horarios, Festivos y Operación
+  const [interactionModality, setInteractionModality] = useState<"virtual" | "presencial" | "domicilio" | "hibrida">("virtual");
   const [scheduleWeekdays, setScheduleWeekdays] = useState("Lunes a Viernes: 8:00 AM - 6:00 PM");
   const [scheduleSaturdays, setScheduleSaturdays] = useState("Sábados: 9:00 AM - 1:00 PM");
-  const [holidayPolicy, setHolidayPolicy] = useState("Cerrado en días festivos");
+  const [holidayPolicy, setHolidayPolicy] = useState("Solo hasta mediodía (8:00 AM - 1:00 PM)");
   const [toleranceMinutes, setToleranceMinutes] = useState(15);
   const [cancellationNotice, setCancellationNotice] = useState("Mínimo 2 horas de anticipación");
   const [paymentMethods, setPaymentMethods] = useState<string[]>([
-    "Nequi / Daviplata",
     "Transferencia Bancolombia",
+    "Nequi / Daviplata",
     "Tarjetas débito/crédito",
     "Efectivo",
   ]);
@@ -89,6 +96,16 @@ export default function OnboardingPage() {
     industry === "Otro (Especificar libremente)"
       ? customIndustry.trim() || "Servicios Comerciales"
       : industry;
+
+  // Ajustar modalidad predeterminada según el sector al cambiar de industria
+  useEffect(() => {
+    const indLower = (effectiveIndustry || "").toLowerCase();
+    if (indLower.includes("software") || indLower.includes("tecnolog") || indLower.includes("consultor") || indLower.includes("digital")) {
+      setInteractionModality("virtual");
+    } else if (indLower.includes("salud") || indLower.includes("belleza") || indLower.includes("restauran") || indLower.includes("taller")) {
+      setInteractionModality("presencial");
+    }
+  }, [effectiveIndustry]);
 
   // Cargar datos previos si existen
   useEffect(() => {
@@ -155,12 +172,14 @@ export default function OnboardingPage() {
       {
         name: newServiceName.trim(),
         price_cop: newServicePrice ? Number(newServicePrice.replace(/\D/g, "")) : "",
-        duration_minutes: newServiceDuration,
+        duration_value: newServiceDurationUnit === "a convenir" ? "" : newServiceDurationValue || 1,
+        duration_unit: newServiceDurationUnit,
       },
     ]);
     setNewServiceName("");
     setNewServicePrice("");
-    setNewServiceDuration(45);
+    setNewServiceDurationValue(1);
+    setNewServiceDurationUnit("horas");
   };
 
   const handleRemoveService = (index: number) => {
@@ -181,49 +200,30 @@ export default function OnboardingPage() {
             .map((s) => {
               const priceStr = s.price_cop
                 ? ` ($${Number(s.price_cop).toLocaleString("es-CO")} COP)`
-                : " (Precio a convenir o según requerimiento)";
-              return `- ${s.name}${priceStr} — duración estimada: ${s.duration_minutes} min`;
+                : " (Precio a convenir o según cotización)";
+              const durationStr =
+                s.duration_unit === "a convenir"
+                  ? "tiempo estimado: A convenir según alcance"
+                  : `tiempo estimado: ${s.duration_value} ${s.duration_unit}`;
+              return `- ${s.name}${priceStr} — ${durationStr}`;
             })
             .join("\n")
         : "- Consulta o atención general personalizada";
 
-    const fullSchedule = `${scheduleWeekdays}\n${scheduleSaturdays}`;
-    const paymentText =
-      paymentMethods.length > 0 ? paymentMethods.join(", ") : "Efectivo y Transferencias bancarias";
-
-    return `## 1. ROL Y ALCANCE
-Eres ${agentName || "el Asistente"}, el asistente virtual de ${companyName || "nuestro negocio"}. Tu función principal es atender a los clientes por WhatsApp con cercanía, resolver dudas sobre nuestros servicios, informar precios y disponibilidad, y agendar sus citas en Google Calendar. Eres especialista en ${effectiveIndustry}.
-
-## 2. DATOS DEL NEGOCIO
-**Nombre de la Empresa:** ${companyName || "Nuestro Negocio"}
-**Actividad / Sector:** ${effectiveIndustry}
-${cityOrCountry ? `**Ubicación:** ${cityOrCountry}` : ""}
-
-**Catálogo de Servicios y Precios:**
-${servicesBlock}
-
-**Horarios de Atención:**
-${fullSchedule}
-- **Días Festivos:** ${holidayPolicy}
-
-**Políticas de Operación:**
-- **Cancelaciones y Cambios:** ${cancellationNotice}
-- **Tolerancia de Espera:** ${toleranceMinutes} minutos antes de reasignar el turno.
-- **Medios de Pago Aceptados:** ${paymentText}
-
-## 3. REGLAS DE ATENCIÓN Y TONO
-1. Comunícate en un tono ${tone}. Sé conciso y cordial (máximo 2 a 3 oraciones por mensaje).
-2. Si el cliente saluda, preséntate brevemente y pregúntale en qué le puedes colaborar hoy.
-3. Responde siempre con base en el catálogo de servicios de este negocio. Si te consultan por algo ajeno a ${effectiveIndustry}, aclara amablemente que solo atiendes requerimientos para ${companyName || "este negocio"}.
-4. Si el cliente pregunta por atención en días festivos, responde de acuerdo con la regla: "${holidayPolicy}".
-
-## 4. PROTOCOLO OBLIGATORIO DE AGENDAMIENTO (GOOGLE CALENDAR)
-- Cuando el cliente solicite disponibilidad, propón opciones concretas dentro del horario laboral (ej: 10:00 AM o 3:30 PM).
-- En cuanto el cliente elija o confirme la fecha y hora de su cita, confirma con entusiasmo la reserva y coloca SIEMPRE al final exacto de tu mensaje el comando:
-[[AGENDAR|YYYY-MM-DD|HH:MM|Nombre del cliente|Servicio]]
-
-## 5. ESCALACIÓN HUMANA
-Si el cliente tiene un requerimiento especial fuera de catálogo o solicita hablar con una persona del equipo, escálalo cordialmente indicando que un asesor se comunicará con él. Contacto: ${whatsappPhone || "nuestro canal principal"}.`.trim();
+    return generateDefaultPrompt(companyName.trim() || "Nuestro Negocio", effectiveIndustry, {
+      agentName: agentName.trim() || "el Asistente",
+      modality: interactionModality,
+      servicesList: servicesBlock,
+      scheduleWeekdays,
+      scheduleSaturdays,
+      holidayPolicy,
+      paymentMethods,
+      toleranceMinutes,
+      cancellationNotice,
+      whatsappPhone,
+      cityOrCountry,
+      tone,
+    });
   };
 
   // Paso 4: AQUÍ SE ACTIVA LA IA (con todo el contexto que el usuario ya llenó manualmente)
@@ -232,32 +232,20 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
     setFeedbackNotice(null);
 
     const compiledLocal = buildLocalMasterPrompt();
+    setGeneratedPrompt(compiledLocal);
+    setFeedbackNotice("¡Master Context generado exitosamente para tu empresa!");
 
+    // Opcionalmente guardar el borrador en backend
     try {
-      // Intentar enriquecer con el endpoint de IA
-      const res = await apiFetch<{
-        recommended_system_prompt?: string;
-      }>("/agents/ai-enrich", {
-        method: "POST",
+      await apiFetch("/agents/me", {
+        method: "PATCH",
         body: JSON.stringify({
-          business_name: companyName.trim(),
-          industry: effectiveIndustry,
-          city_or_country: cityOrCountry,
-          extra_notes: `Servicios: ${serviceItems.map((s) => s.name).join(", ")}. Festivos: ${holidayPolicy}.`,
+          company_name: companyName.trim() || undefined,
+          system_prompt_generated: compiledLocal,
         }),
       });
-
-      if (res?.recommended_system_prompt) {
-        setGeneratedPrompt(res.recommended_system_prompt);
-        setFeedbackNotice("¡Master Context optimizado y redactado exitosamente con IA!");
-      } else {
-        setGeneratedPrompt(compiledLocal);
-        setFeedbackNotice("¡Master Context generado exitosamente con tus respuestas!");
-      }
     } catch {
-      // Si la API tarda o está desplegando, usamos la síntesis estructurada basada en sus respuestas
-      setGeneratedPrompt(compiledLocal);
-      setFeedbackNotice("¡Master Context generado exitosamente a partir de tus respuestas!");
+      // Ignorar fallo de red silenciosamente
     } finally {
       setIsGeneratingWithAI(false);
       setStep(4);
@@ -279,7 +267,8 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
     const servicesBlock = serviceItems
       .map((s) => {
         const priceStr = s.price_cop ? ` ($${Number(s.price_cop).toLocaleString("es-CO")} COP)` : "";
-        return `- ${s.name}${priceStr} — ${s.duration_minutes} min`;
+        const durStr = s.duration_unit === "a convenir" ? "A convenir" : `${s.duration_value} ${s.duration_unit}`;
+        return `- ${s.name}${priceStr} — ${durStr}`;
       })
       .join("\n");
 
@@ -297,6 +286,7 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
             business_name: cleanName,
             industry: effectiveIndustry,
             business_type: effectiveIndustry,
+            interaction_modality: interactionModality,
             whatsappPhone,
             services: servicesBlock,
             schedule: fullSchedule,
@@ -493,12 +483,14 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
                               <DollarSign className="w-3 h-3" />
                               {item.price_cop
                                 ? `$${Number(item.price_cop).toLocaleString("es-CO")} COP`
-                                : "Precio según requerimiento"}
+                                : "Precio a convenir"}
                             </span>
                             <span>•</span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {item.duration_minutes} min
+                              {item.duration_unit === "a convenir"
+                                ? "A convenir"
+                                : `${item.duration_value} ${item.duration_unit}`}
                             </span>
                           </div>
                         </div>
@@ -523,11 +515,11 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
                     + Añadir un servicio o producto
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                    <div className="sm:col-span-6">
+                    <div className="sm:col-span-5">
                       <Input
                         value={newServiceName}
                         onChange={(e) => setNewServiceName(e.target.value)}
-                        placeholder="Nombre (ej: Asesoría Contable, Corte de cabello...)"
+                        placeholder="Nombre (ej: Desarrollo Web, Asesoría, Consulta...)"
                         className="h-8 text-xs bg-white dark:bg-zinc-950"
                       />
                     </div>
@@ -540,18 +532,34 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
                         className="h-8 text-xs bg-white dark:bg-zinc-950"
                       />
                     </div>
-                    <div className="sm:col-span-3">
+                    <div className="sm:col-span-2">
+                      {newServiceDurationUnit !== "a convenir" ? (
+                        <Input
+                          type="number"
+                          min={1}
+                          value={newServiceDurationValue}
+                          onChange={(e) => setNewServiceDurationValue(e.target.value)}
+                          placeholder="Cant."
+                          className="h-8 text-xs bg-white dark:bg-zinc-950 text-center"
+                        />
+                      ) : (
+                        <div className="h-8 flex items-center justify-center text-[10px] text-zinc-400 border rounded-md border-zinc-200 dark:border-zinc-800">
+                          Libre
+                        </div>
+                      )}
+                    </div>
+                    <div className="sm:col-span-2">
                       <select
-                        value={newServiceDuration}
-                        onChange={(e) => setNewServiceDuration(Number(e.target.value))}
-                        className="w-full h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs"
+                        value={newServiceDurationUnit}
+                        onChange={(e) => setNewServiceDurationUnit(e.target.value as ServiceDurationUnit)}
+                        className="w-full h-8 px-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs"
                       >
-                        <option value={15}>15 min</option>
-                        <option value={30}>30 min</option>
-                        <option value={45}>45 min</option>
-                        <option value={60}>60 min</option>
-                        <option value={90}>90 min</option>
-                        <option value={120}>120 min</option>
+                        <option value="minutos">minutos</option>
+                        <option value="horas">horas</option>
+                        <option value="días">días</option>
+                        <option value="semanas">semanas</option>
+                        <option value="meses">meses</option>
+                        <option value="a convenir">A convenir</option>
                       </select>
                     </div>
                   </div>
@@ -588,19 +596,65 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
             </>
           )}
 
-          {/* PASO 3: HORARIOS, FESTIVOS Y OPERACIÓN */}
+          {/* PASO 3: MODALIDAD, HORARIOS, FESTIVOS Y OPERACIÓN */}
           {step === 3 && (
             <>
               <CardHeader>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-indigo-500" />
-                  Paso 3: Horarios, Festivos y Reglas
+                  Paso 3: Modalidad, Horarios y Reglas
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Define cómo opera tu negocio para que el asistente no cometa errores de agenda.
+                  Define cómo opera tu negocio para que el asistente agende citas o reuniones con exactitud.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
+                {/* Modalidad Principal de Atención */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                    <Briefcase className="w-4 h-4 text-indigo-500" />
+                    ¿Cómo atiendes o interactúas con tus clientes?
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      {
+                        id: "virtual" as const,
+                        title: "💻 Reuniones Virtuales / Demos",
+                        desc: "Google Meet o Zoom (Software, consultoría, cursos)",
+                      },
+                      {
+                        id: "presencial" as const,
+                        title: "🏢 Presencial en Sede / Local",
+                        desc: "Oficina, consultorio, local o tienda física",
+                      },
+                      {
+                        id: "domicilio" as const,
+                        title: "🚗 A Domicilio / En Terreno",
+                        desc: "Visitas técnicas, inspecciones o terreno",
+                      },
+                      {
+                        id: "hibrida" as const,
+                        title: "🔄 Híbrida / Según el Cliente",
+                        desc: "El cliente elige si prefiere virtual o presencial",
+                      },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setInteractionModality(m.id)}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          interactionModality === m.id
+                            ? "bg-indigo-50/80 border-indigo-600 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-200 shadow-2xs"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
+                        }`}
+                      >
+                        <p className="font-semibold text-xs">{m.title}</p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">{m.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Horarios semanales */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -658,7 +712,9 @@ Si el cliente tiene un requerimiento especial fuera de catálogo o solicita habl
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Tolerancia de espera al cliente
+                      {interactionModality === "virtual"
+                        ? "Tolerancia de conexión a la videollamada"
+                        : "Tolerancia de espera al cliente"}
                     </label>
                     <div className="flex gap-2">
                       {[10, 15, 20].map((mins) => (

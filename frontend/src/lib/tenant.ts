@@ -70,18 +70,18 @@ export interface ConversationSummary {
 export function getTenantContext(): TenantContext {
   if (typeof window === "undefined") {
     return {
-      id: "dra-garcia-dental",
-      slug: "dra-garcia-dental",
-      name: "Clínica Dental & Estética Santa María",
-      industry: "Salud y Cuidado Dental",
-      email: "contacto@dentalcare.com",
+      id: "mi-empresa",
+      slug: "mi-empresa",
+      name: "Mi Empresa",
+      industry: "Servicios y Consultoría",
+      email: "contacto@miempresa.com",
     };
   }
 
-  const id = localStorage.getItem("zolution_org_id") || "dra-garcia-dental";
+  const id = localStorage.getItem("zolution_org_id") || "mi-empresa";
   const slug = localStorage.getItem("zolution_org_slug") || id;
-  const name = localStorage.getItem("zolution_org_name") || "Clínica Dental & Estética Santa María";
-  const industry = localStorage.getItem("zolution_org_industry") || "Salud y Cuidado Dental";
+  const name = localStorage.getItem("zolution_org_name") || "Mi Empresa";
+  const industry = localStorage.getItem("zolution_org_industry") || "Servicios y Consultoría";
   const email = localStorage.getItem("zolution_user_email") || `contacto@${slug || "empresa"}.com`;
   const prompt = localStorage.getItem("zolution_agent_prompt") || undefined;
 
@@ -90,62 +90,117 @@ export function getTenantContext(): TenantContext {
 
 export function detectIndustryCategory(industryStr: string, nameStr: string): "dental" | "legal" | "tech" | "spa" | "general" {
   const combined = `${industryStr} ${nameStr}`.toLowerCase();
-  if (combined.includes("dental") || combined.includes("odontol") || combined.includes("médic") || combined.includes("salud")) {
+  if (combined.includes("dental") || combined.includes("odontol") || combined.includes("ortodon")) {
     return "dental";
   }
   if (combined.includes("legal") || combined.includes("jurídic") || combined.includes("abogad") || combined.includes("ley")) {
     return "legal";
   }
-  if (combined.includes("tech") || combined.includes("cloud") || combined.includes("soft") || combined.includes("tecnolog") || combined.includes("sistemas")) {
+  if (combined.includes("tech") || combined.includes("cloud") || combined.includes("soft") || combined.includes("tecnolog") || combined.includes("sistemas") || combined.includes("digital") || combined.includes("desarrollo")) {
     return "tech";
   }
-  if (combined.includes("spa") || combined.includes("wellness") || combined.includes("belleza") || combined.includes("estétic") || combined.includes("masaje")) {
+  if (combined.includes("spa") || combined.includes("wellness") || combined.includes("belleza") || combined.includes("estétic") || combined.includes("masaje") || combined.includes("peluquer")) {
     return "spa";
   }
   return "general";
 }
 
-export function generateDefaultPrompt(orgName: string, industry: string): string {
-  const cleanName = orgName || "Nuestro Negocio";
-  const cleanInd = industry || "Servicios Profesionales";
+export interface PromptBuildOptions {
+  agentName?: string;
+  modality?: "virtual" | "presencial" | "domicilio" | "hibrida";
+  servicesList?: string;
+  scheduleWeekdays?: string;
+  scheduleSaturdays?: string;
+  holidayPolicy?: string;
+  paymentMethods?: string[];
+  toleranceMinutes?: number;
+  cancellationNotice?: string;
+  whatsappPhone?: string;
+  cityOrCountry?: string;
+  tone?: string;
+}
+
+export function generateDefaultPrompt(
+  orgName: string,
+  industry: string,
+  opts?: PromptBuildOptions
+): string {
+  const cleanName = orgName?.trim() || "Nuestro Negocio";
+  const cleanInd = industry?.trim() || "Servicios Comerciales y Profesionales";
+  const agentName = opts?.agentName || "el Asistente";
+  const modality = opts?.modality || (detectIndustryCategory(cleanInd, cleanName) === "tech" ? "virtual" : "presencial");
+
+  const servicesBlock = opts?.servicesList || `
+- Consulta o Asesoría Inicial personalizada
+- Servicio Estándar según requerimiento del cliente
+- Proyecto o Solución Integral a la medida`.trim();
+
+  const weekdays = opts?.scheduleWeekdays || "Lunes a Viernes: 8:00 AM - 6:00 PM";
+  const saturdays = opts?.scheduleSaturdays || "Sábados: 9:00 AM - 1:00 PM";
+  const holiday = opts?.holidayPolicy || "Atención en días festivos solo hasta mediodía (8:00 AM - 1:00 PM) o con previa reserva";
+  const payments = opts?.paymentMethods?.length
+    ? opts.paymentMethods.join(", ")
+    : "Transferencias bancarias, Nequi, Daviplata, Tarjetas y Efectivo";
+  const tolerance = opts?.toleranceMinutes ?? 15;
+  const cancellation = opts?.cancellationNotice || "Avisar con al menos 2 horas de anticipación";
+  const location = opts?.cityOrCountry ? `**Ubicación:** ${opts.cityOrCountry}\n` : "";
+  const phone = opts?.whatsappPhone ? ` Canal oficial: ${opts.whatsappPhone}.` : "";
+  const tone = opts?.tone || "Cálido, profesional y resolutivo";
+
+  const modalityDescriptions = {
+    virtual: "Modalidad: 100% Virtual / Remota (Reuniones por Google Meet / Zoom)",
+    presencial: "Modalidad: Presencial en nuestras instalaciones / oficinas",
+    domicilio: "Modalidad: A Domicilio / En terreno con visita técnica previa",
+    hibrida: "Modalidad: Híbrida (Virtual o Presencial a elección del cliente)",
+  };
+
+  const meetingActionRules = {
+    virtual: `- Tipo de agendamiento: REUNIÓN VIRTUAL / DEMO (Google Meet).
+- Al confirmar la reunión, solicita amablemente el correo electrónico del cliente para enviarle el link de Google Meet.
+- Tolerancia de conexión a la videollamada: ${tolerance} minutos antes de reprogramar.`,
+    presencial: `- Tipo de agendamiento: CITA PRESENCIAL en nuestras instalaciones.
+- Tolerancia de espera en sede: ${tolerance} minutos.`,
+    domicilio: `- Tipo de agendamiento: VISITA A DOMICILIO / EN TERRENO.
+- Confirma siempre la dirección exacta y punto de referencia.`,
+    hibrida: `- Tipo de agendamiento: REUNIÓN O CITA (Pregunta al cliente si prefiere Virtual por Google Meet o Presencial).
+- Tolerancia de espera / conexión: ${tolerance} minutos.`,
+  };
 
   return `## 1. ROL Y ALCANCE
-Eres el asistente virtual de ${cleanName}. Tu función principal es atender a los clientes por WhatsApp con cercanía y calidez, resolver dudas sobre nuestros servicios (${cleanInd}), informar precios y disponibilidad, y agendar sus citas en Google Calendar.
+Eres ${agentName}, el asistente virtual oficial de ${cleanName}. Tu función principal es atender a prospectos y clientes por WhatsApp con cercanía, resolver dudas sobre nuestros servicios o productos (${cleanInd}), brindar información de tarifas o tiempos de entrega y agendar reuniones o citas en Google Calendar.
 
 ## 2. DATOS DEL NEGOCIO
 **Nombre de la Empresa:** ${cleanName}
 **Sector / Actividad:** ${cleanInd}
-**Ubicación:** Colombia
+${location}**${modalityDescriptions[modality]}**
 
-**Catálogo de Servicios y Atención:**
-- Consulta o Asesoría Inicial personalizada
-- Servicio Estándar de Atención según requerimiento del cliente
-- Servicio Especializado / Integral
+**Catálogo de Servicios / Productos y Tiempos:**
+${servicesBlock}
 
 **Horarios de Atención:**
-- Lunes a Viernes: 8:00 AM - 6:00 PM
-- Sábados: 9:00 AM - 1:00 PM
-- **Días Festivos:** Cerrado o atención hasta mediodía (8:00 AM - 1:00 PM).
+- ${weekdays}
+- ${saturdays}
+- **Días Festivos:** ${holiday}
 
 **Políticas de Operación y Pagos:**
-- **Cancelaciones y Cambios:** Avisar con al menos 2 horas de anticipación.
-- **Tolerancia de Espera:** 15 minutos antes de reasignar el turno.
-- **Medios de Pago Aceptados:** Nequi, Daviplata, Transferencia Bancolombia, Tarjetas débito/crédito y Efectivo.
+- **Cancelaciones / Cambios:** ${cancellation}
+${meetingActionRules[modality]}
+- **Medios de Pago Aceptados:** ${payments}
 
-## 3. REGLAS DE ATENCIÓN Y GUARDRAILS
-1. Hablas directamente por WhatsApp. Mantén un tono cálido, profesional y resolutivo.
-2. Sé conciso: máximo 2 a 3 oraciones breves por mensaje, ideal para lectura ágil.
-3. Si el cliente saluda, salúdalo con amabilidad, preséntate brevemente y pregúntale cómo le puedes colaborar hoy.
-4. Solo respondes requerimientos y temas vinculados a ${cleanName} y su actividad de ${cleanInd}. Ante preguntas ajenas, aclara amablemente que estás enfocado en la atención de este negocio.
-5. Si el cliente pregunta por atención en días festivos, recuerda amablemente que solo se atiende hasta mediodía o con previa cita.
+## 3. REGLAS DE ATENCIÓN Y TONO
+1. Hablas directamente por WhatsApp en un tono ${tone}.
+2. Sé conciso: máximo 2 a 3 oraciones breves por mensaje, facilitando una lectura ágil en dispositivos móviles.
+3. Si el cliente saluda (ej: 'hola', 'buenas'), salúdalo amablemente, preséntate brevemente y pregúntale en qué le puedes colaborar hoy.
+4. Responde estrictamente sobre la actividad y servicios de ${cleanName}. Si te preguntan por temas no relacionados, aclara con educación que estás enfocado en la atención de este negocio.
+5. Si el cliente pregunta por disponibilidad en días festivos, responde aplicando la regla: "${holiday}".
 
 ## 4. PROTOCOLO OBLIGATORIO DE AGENDAMIENTO (GOOGLE CALENDAR)
-- Cuando el cliente solicite una cita, consulta o propón horarios lógicos dentro de la jornada laboral (ej: 10:00 AM o 3:30 PM).
-- En cuanto el cliente elija o confirme la fecha y hora de su cita, confirma con entusiasmo la reserva y coloca SIEMPRE al final exacto de tu mensaje el comando:
-[[AGENDAR|YYYY-MM-DD|HH:MM|Nombre del cliente|Servicio]]
+- Cuando el cliente solicite disponibilidad o una cita/reunión, propón 2 opciones lógicas dentro del horario de atención (ej: 10:00 AM o 3:30 PM).
+- En cuanto el cliente elija o confirme la fecha y hora, confirma con entusiasmo la reserva y coloca SIEMPRE al final exacto de tu respuesta el comando:
+[[AGENDAR|YYYY-MM-DD|HH:MM|Nombre del cliente|Servicio o Asunto]]
 
 ## 5. ESCALACIÓN HUMANA
-Si el cliente tiene una duda compleja fuera del catálogo o solicita hablar con una persona del equipo, indícale amablemente que un asesor se comunicará con él.`.trim();
+Si el cliente tiene un caso complejo fuera del catálogo estándar o solicita hablar con una persona, escálalo cordialmente indicando que un asesor del equipo se comunicará en breve.${phone}`.trim();
 }
 
 export function getTenantEvents(orgName: string, industry: string): ActivityEvent[] {

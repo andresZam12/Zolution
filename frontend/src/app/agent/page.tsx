@@ -153,33 +153,30 @@ export default function AgentConfigPage() {
     const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry);
     setPrompt(freshPrompt);
     localStorage.setItem("zolution_agent_prompt", freshPrompt);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
   };
 
   const handleAIEnrichPrompt = async () => {
     setIsEnrichingPrompt(true);
     try {
-      const res = await apiFetch<{
-        recommended_system_prompt?: string;
-      }>("/agents/ai-enrich", {
-        method: "POST",
-        body: JSON.stringify({
-          business_name: tenant.name || "Mi Negocio",
-          industry: tenant.industry || "Servicios",
-          city_or_country: "Colombia",
-        }),
+      // Generar Master System Prompt imparcial y completo usando el motor de contexto
+      const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry, {
+        holidayPolicy: "Atención en días festivos solo hasta mediodía (8:00 AM - 1:00 PM)",
+        toleranceMinutes: 15,
+        cancellationNotice: "Avisar con al menos 2 horas de anticipación",
       });
-      if (res?.recommended_system_prompt) {
-        setPrompt(res.recommended_system_prompt);
-        localStorage.setItem("zolution_agent_prompt", res.recommended_system_prompt);
-        setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
-        return;
-      }
-    } catch {
-      // Si la API remota está desplegando o no responde, genera el Master Context localmente
-      const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry);
       setPrompt(freshPrompt);
       localStorage.setItem("zolution_agent_prompt", freshPrompt);
+
+      // Guardar inmediatamente en el agente
+      await apiFetch("/agents/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          system_prompt_generated: freshPrompt,
+        }),
+      }).catch(() => null);
+
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     } finally {
