@@ -227,29 +227,15 @@ export default function OnboardingPage() {
   };
 
   // Paso 4: AQUÍ SE ACTIVA LA IA (con todo el contexto que el usuario ya llenó manualmente)
-  const handleGenerateWithAI = async () => {
+  const handleGenerateWithAI = () => {
     setIsGeneratingWithAI(true);
     setFeedbackNotice(null);
 
     const compiledLocal = buildLocalMasterPrompt();
     setGeneratedPrompt(compiledLocal);
     setFeedbackNotice("¡Master Context generado exitosamente para tu empresa!");
-
-    // Opcionalmente guardar el borrador en backend
-    try {
-      await apiFetch("/agents/me", {
-        method: "PATCH",
-        body: JSON.stringify({
-          company_name: companyName.trim() || undefined,
-          system_prompt_generated: compiledLocal,
-        }),
-      });
-    } catch {
-      // Ignorar fallo de red silenciosamente
-    } finally {
-      setIsGeneratingWithAI(false);
-      setStep(4);
-    }
+    setIsGeneratingWithAI(false);
+    setStep(4);
   };
 
   const handleFinishOnboarding = async () => {
