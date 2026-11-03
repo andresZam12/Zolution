@@ -17,8 +17,7 @@ import {
   DollarSign,
   Calendar,
   CreditCard,
-  AlertCircle,
-  HelpCircle,
+  Briefcase,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,15 +27,16 @@ import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
 
 const PREDEFINED_INDUSTRIES = [
-  "Salud y Consultorios Médicos/Dentales",
-  "Belleza, Spas y Cuidado Personal",
   "Servicios Profesionales y Consultoría",
-  "Servicios Legales y Jurídicos",
+  "Comercio, Tienda y Retail",
   "Restaurantes, Cafés y Gastronomía",
-  "Talleres Automotrices y Mantenimiento",
-  "Tecnología, Software y Soporte",
+  "Belleza, Peluquerías, Spas y Cuidado Personal",
+  "Salud, Medicina y Consultorios",
+  "Talleres, Mecánica y Mantenimiento",
   "Inmobiliaria y Bienes Raíces",
-  "Comercio y Retail",
+  "Educación, Cursos y Clases",
+  "Tecnología, Software y Soporte Digital",
+  "Otro (Especificar libremente)",
 ];
 
 interface ServiceItemState {
@@ -48,30 +48,29 @@ interface ServiceItemState {
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [isEnriching, setIsEnriching] = useState(false);
+  const [isGeneratingWithAI, setIsGeneratingWithAI] = useState(false);
   const [isSavingFinish, setIsSavingFinish] = useState(false);
-  const [enrichmentNotice, setEnrichmentNotice] = useState<string | null>(null);
+  const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
 
-  // Form State - Step 1: Negocio
+  // Paso 1: Tu Negocio (Completamente imparcial y neutral desde cero)
   const [companyName, setCompanyName] = useState("");
-  const [industry, setIndustry] = useState("Salud y Consultorios Médicos/Dentales");
+  const [industry, setIndustry] = useState("Servicios Profesionales y Consultoría");
   const [customIndustry, setCustomIndustry] = useState("");
-  const [whatsappPhone, setWhatsappPhone] = useState("+57 311 000 0000");
+  const [cityOrCountry, setCityOrCountry] = useState("Colombia");
+  const [whatsappPhone, setWhatsappPhone] = useState("");
 
-  // Form State - Step 2: Servicios
+  // Paso 2: Servicios o Productos (Sin datos precargados de ningún sector específico)
   const [serviceItems, setServiceItems] = useState<ServiceItemState[]>([
-    { name: "Valoración y Diagnóstico Inicial", price_cop: 30000, duration_minutes: 30 },
-    { name: "Limpieza Dental Profunda (Profilaxis)", price_cop: 80000, duration_minutes: 45 },
-    { name: "Control de Ortodoncia", price_cop: 55000, duration_minutes: 30 },
+    { name: "Atención o Asesoría Inicial", price_cop: "", duration_minutes: 45 },
   ]);
   const [newServiceName, setNewServiceName] = useState("");
   const [newServicePrice, setNewServicePrice] = useState("");
   const [newServiceDuration, setNewServiceDuration] = useState(45);
 
-  // Form State - Step 3: Horarios, Festivos y Políticas
+  // Paso 3: Horarios, Festivos y Operación
   const [scheduleWeekdays, setScheduleWeekdays] = useState("Lunes a Viernes: 8:00 AM - 6:00 PM");
-  const [scheduleSaturdays, setScheduleSaturdays] = useState("Sábados: 8:00 AM - 1:00 PM");
-  const [holidayPolicy, setHolidayPolicy] = useState("Solo hasta mediodía (8:00 AM - 1:00 PM)");
+  const [scheduleSaturdays, setScheduleSaturdays] = useState("Sábados: 9:00 AM - 1:00 PM");
+  const [holidayPolicy, setHolidayPolicy] = useState("Cerrado en días festivos");
   const [toleranceMinutes, setToleranceMinutes] = useState(15);
   const [cancellationNotice, setCancellationNotice] = useState("Mínimo 2 horas de anticipación");
   const [paymentMethods, setPaymentMethods] = useState<string[]>([
@@ -80,16 +79,18 @@ export default function OnboardingPage() {
     "Tarjetas débito/crédito",
     "Efectivo",
   ]);
-  const [agentName, setAgentName] = useState("Sofía");
+  const [agentName, setAgentName] = useState("Asistente");
   const [tone, setTone] = useState("Cálido, profesional y resolutivo");
 
-  // Step 4: Prompt
+  // Paso 4: Prompt Generado
   const [generatedPrompt, setGeneratedPrompt] = useState("");
 
   const effectiveIndustry =
-    industry === "Otro" ? customIndustry.trim() || "Servicios Profesionales" : industry;
+    industry === "Otro (Especificar libremente)"
+      ? customIndustry.trim() || "Servicios Comerciales"
+      : industry;
 
-  // Initial load
+  // Cargar datos previos si existen
   useEffect(() => {
     const savedName = localStorage.getItem("zolution_org_name");
     const savedIndustry = localStorage.getItem("zolution_org_industry");
@@ -98,7 +99,7 @@ export default function OnboardingPage() {
       if (PREDEFINED_INDUSTRIES.includes(savedIndustry)) {
         setIndustry(savedIndustry);
       } else {
-        setIndustry("Otro");
+        setIndustry("Otro (Especificar libremente)");
         setCustomIndustry(savedIndustry);
       }
     }
@@ -125,7 +126,7 @@ export default function OnboardingPage() {
           if (dbInd) {
             if (PREDEFINED_INDUSTRIES.includes(dbInd)) setIndustry(dbInd);
             else {
-              setIndustry("Otro");
+              setIndustry("Otro (Especificar libremente)");
               setCustomIndustry(dbInd);
             }
           }
@@ -134,79 +135,18 @@ export default function OnboardingPage() {
           if (typeof ans.tone === "string" && ans.tone) setTone(ans.tone);
           if (typeof ans.holiday_policy === "string" && ans.holiday_policy) setHolidayPolicy(ans.holiday_policy);
           if (typeof ans.tolerance_minutes === "number") setToleranceMinutes(ans.tolerance_minutes);
+          if (typeof ans.whatsappPhone === "string" && ans.whatsappPhone) setWhatsappPhone(ans.whatsappPhone);
         }
         if (agentData?.system_prompt_generated) {
           setGeneratedPrompt(agentData.system_prompt_generated);
         }
       } catch {
-        // Keep initial state
+        // Fallback local
       }
     };
 
     fetchBackendData();
   }, []);
-
-  // AI Enrichment Trigger
-  const handleAIEnrich = async () => {
-    if (!companyName.trim()) return;
-    setIsEnriching(true);
-    setEnrichmentNotice(null);
-
-    try {
-      const res = await apiFetch<{
-        agent_name: string;
-        tone: string;
-        services: { name: string; price_cop?: number; duration_minutes: number; description?: string }[];
-        schedule_weekdays: string;
-        schedule_saturdays: string;
-        holiday_policy: string;
-        cancellation_policy: string;
-        tolerance_minutes: number;
-        payment_methods: string[];
-        faqs: { question: string; answer: string }[];
-        recommended_system_prompt: string;
-      }>("/agents/ai-enrich", {
-        method: "POST",
-        body: JSON.stringify({
-          business_name: companyName.trim(),
-          industry: effectiveIndustry,
-          city_or_country: "Colombia",
-        }),
-      });
-
-      if (res) {
-        if (res.agent_name) setAgentName(res.agent_name);
-        if (res.tone) setTone(res.tone);
-        if (res.services && res.services.length > 0) {
-          setServiceItems(
-            res.services.map((s) => ({
-              name: s.name,
-              price_cop: s.price_cop ?? "",
-              duration_minutes: s.duration_minutes || 45,
-            }))
-          );
-        }
-        if (res.schedule_weekdays) setScheduleWeekdays(res.schedule_weekdays);
-        if (res.schedule_saturdays) setScheduleSaturdays(res.schedule_saturdays);
-        if (res.holiday_policy) setHolidayPolicy(res.holiday_policy);
-        if (res.tolerance_minutes) setToleranceMinutes(res.tolerance_minutes);
-        if (res.cancellation_policy) setCancellationNotice(res.cancellation_policy);
-        if (res.payment_methods && res.payment_methods.length > 0) {
-          setPaymentMethods(res.payment_methods);
-        }
-        if (res.recommended_system_prompt) {
-          setGeneratedPrompt(res.recommended_system_prompt);
-        }
-
-        setEnrichmentNotice(`¡Sugerencias lógicas aplicadas para ${effectiveIndustry}!`);
-        setStep(2); // Auto navigate to review catalog
-      }
-    } catch {
-      setEnrichmentNotice("No pudimos consultar la IA temporalmente. Puedes continuar manualmente.");
-    } finally {
-      setIsEnriching(false);
-    }
-  };
 
   const handleAddService = () => {
     if (!newServiceName.trim()) return;
@@ -233,57 +173,95 @@ export default function OnboardingPage() {
     );
   };
 
-  // Compile final Master System Prompt
-  const compileSystemPrompt = () => {
-    const servicesBlock = serviceItems
-      .map((s) => {
-        const priceStr = s.price_cop ? ` ($${Number(s.price_cop).toLocaleString("es-CO")} COP)` : "";
-        return `- ${s.name}${priceStr} — ${s.duration_minutes} min`;
-      })
-      .join("\n");
+  // Compilar Master System Prompt de forma imparcial basándonos 100% en las respuestas reales del usuario
+  const buildLocalMasterPrompt = () => {
+    const servicesBlock =
+      serviceItems.length > 0
+        ? serviceItems
+            .map((s) => {
+              const priceStr = s.price_cop
+                ? ` ($${Number(s.price_cop).toLocaleString("es-CO")} COP)`
+                : " (Precio a convenir o según requerimiento)";
+              return `- ${s.name}${priceStr} — duración estimada: ${s.duration_minutes} min`;
+            })
+            .join("\n")
+        : "- Consulta o atención general personalizada";
 
     const fullSchedule = `${scheduleWeekdays}\n${scheduleSaturdays}`;
-    const paymentText = paymentMethods.length > 0 ? paymentMethods.join(", ") : "Efectivo y Transferencias";
+    const paymentText =
+      paymentMethods.length > 0 ? paymentMethods.join(", ") : "Efectivo y Transferencias bancarias";
 
     return `## 1. ROL Y ALCANCE
-Eres ${agentName}, el asistente virtual de ${companyName || "nuestro negocio"}. Tu objetivo es atender a los clientes por WhatsApp con calidez, resolver dudas sobre nuestros servicios y agendar sus citas en Google Calendar. Eres especialista en ${effectiveIndustry}.
+Eres ${agentName || "el Asistente"}, el asistente virtual de ${companyName || "nuestro negocio"}. Tu función principal es atender a los clientes por WhatsApp con cercanía, resolver dudas sobre nuestros servicios, informar precios y disponibilidad, y agendar sus citas en Google Calendar. Eres especialista en ${effectiveIndustry}.
 
 ## 2. DATOS DEL NEGOCIO
-**Nombre:** ${companyName || "Nuestro Negocio"}
-**Sector:** ${effectiveIndustry}
+**Nombre de la Empresa:** ${companyName || "Nuestro Negocio"}
+**Actividad / Sector:** ${effectiveIndustry}
+${cityOrCountry ? `**Ubicación:** ${cityOrCountry}` : ""}
 
-**Catálogo de Servicios y Tarifas (en pesos colombianos COP):**
-${servicesBlock || "- Atención y valoración general"}
+**Catálogo de Servicios y Precios:**
+${servicesBlock}
 
-**Horario de Atención:**
+**Horarios de Atención:**
 ${fullSchedule}
 - **Días Festivos:** ${holidayPolicy}
 
-**Políticas de Operación y Pagos:**
+**Políticas de Operación:**
 - **Cancelaciones y Cambios:** ${cancellationNotice}
-- **Tolerancia de Llegada:** ${toleranceMinutes} minutos de espera antes de liberar el turno.
+- **Tolerancia de Espera:** ${toleranceMinutes} minutos antes de reasignar el turno.
 - **Medios de Pago Aceptados:** ${paymentText}
-- **Urgencias:** No atendemos urgencias críticas sin cita previa.
 
-## 3. REGLAS DE ATENCIÓN Y GUARDRAILS
-1. NUNCA inventes precios, horarios o servicios que no estén listados en el catálogo. Si no sabes un dato, dilo con amabilidad y ofrece consultar con el equipo humano.
-2. Comunícate en un tono ${tone}. Máximo 2 a 3 oraciones breves por mensaje, ideal para lectura ágil en WhatsApp.
-3. Usa emojis con moderación (máximo 1 o 2 por mensaje).
-4. Si el cliente pregunta por horarios en días festivos, recuerda amablemente: "${holidayPolicy}".
+## 3. REGLAS DE ATENCIÓN Y TONO
+1. Comunícate en un tono ${tone}. Sé conciso y cordial (máximo 2 a 3 oraciones por mensaje).
+2. Si el cliente saluda, preséntate brevemente y pregúntale en qué le puedes colaborar hoy.
+3. Responde siempre con base en el catálogo de servicios de este negocio. Si te consultan por algo ajeno a ${effectiveIndustry}, aclara amablemente que solo atiendes requerimientos para ${companyName || "este negocio"}.
+4. Si el cliente pregunta por atención en días festivos, responde de acuerdo con la regla: "${holidayPolicy}".
 
 ## 4. PROTOCOLO OBLIGATORIO DE AGENDAMIENTO (GOOGLE CALENDAR)
-- Si el cliente pregunta horarios, ofrece opciones concretas dentro del horario laboral (ej: 10:00 AM o 3:30 PM).
+- Cuando el cliente solicite disponibilidad, propón opciones concretas dentro del horario laboral (ej: 10:00 AM o 3:30 PM).
 - En cuanto el cliente elija o confirme la fecha y hora de su cita, confirma con entusiasmo la reserva y coloca SIEMPRE al final exacto de tu mensaje el comando:
 [[AGENDAR|YYYY-MM-DD|HH:MM|Nombre del cliente|Servicio]]
 
 ## 5. ESCALACIÓN HUMANA
-Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita hablar con una persona de nuestro equipo. Contacto: ${whatsappPhone}.`;
+Si el cliente tiene un requerimiento especial fuera de catálogo o solicita hablar con una persona del equipo, escálalo cordialmente indicando que un asesor se comunicará con él. Contacto: ${whatsappPhone || "nuestro canal principal"}.`.trim();
   };
 
-  const handleGoToStep4 = () => {
-    const prompt = compileSystemPrompt();
-    setGeneratedPrompt(prompt);
-    setStep(4);
+  // Paso 4: AQUÍ SE ACTIVA LA IA (con todo el contexto que el usuario ya llenó manualmente)
+  const handleGenerateWithAI = async () => {
+    setIsGeneratingWithAI(true);
+    setFeedbackNotice(null);
+
+    const compiledLocal = buildLocalMasterPrompt();
+
+    try {
+      // Intentar enriquecer con el endpoint de IA
+      const res = await apiFetch<{
+        recommended_system_prompt?: string;
+      }>("/agents/ai-enrich", {
+        method: "POST",
+        body: JSON.stringify({
+          business_name: companyName.trim(),
+          industry: effectiveIndustry,
+          city_or_country: cityOrCountry,
+          extra_notes: `Servicios: ${serviceItems.map((s) => s.name).join(", ")}. Festivos: ${holidayPolicy}.`,
+        }),
+      });
+
+      if (res?.recommended_system_prompt) {
+        setGeneratedPrompt(res.recommended_system_prompt);
+        setFeedbackNotice("¡Master Context optimizado y redactado exitosamente con IA!");
+      } else {
+        setGeneratedPrompt(compiledLocal);
+        setFeedbackNotice("¡Master Context generado exitosamente con tus respuestas!");
+      }
+    } catch {
+      // Si la API tarda o está desplegando, usamos la síntesis estructurada basada en sus respuestas
+      setGeneratedPrompt(compiledLocal);
+      setFeedbackNotice("¡Master Context generado exitosamente a partir de tus respuestas!");
+    } finally {
+      setIsGeneratingWithAI(false);
+      setStep(4);
+    }
   };
 
   const handleFinishOnboarding = async () => {
@@ -333,7 +311,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
         }),
       });
     } catch {
-      // Local fallback
+      // Guardado local
     } finally {
       setIsSavingFinish(false);
       window.dispatchEvent(new Event("storage"));
@@ -343,8 +321,8 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-10 px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
-      <div className="max-w-3xl mx-auto w-full space-y-6">
-        {/* Header and Step Indicator */}
+      <div className="max-w-2xl mx-auto w-full space-y-6">
+        {/* Header y Progreso */}
         <div className="text-center space-y-2">
           <Badge
             variant="outline"
@@ -353,13 +331,13 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
             Paso {step} de 4
           </Badge>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Configuración Inteligente de tu Agente
+            Crea tu Asistente de Negocio
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto">
-            Configura en segundos la lógica de tu negocio. Con IA creamos un perfil operativo completo para que atienda y agende por WhatsApp sin que tengas que redactar prompts complicados.
+          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+            Responde 3 preguntas sencillas sobre tu empresa y al final la IA construirá un Master Context perfecto para tu sector.
           </p>
 
-          {/* Progress bar */}
+          {/* Barra de progreso */}
           <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mt-4">
             <div
               className="bg-indigo-600 h-full transition-all duration-300"
@@ -368,52 +346,52 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
           </div>
         </div>
 
-        {enrichmentNotice && (
-          <div className="flex items-center justify-between text-xs px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40 shadow-2xs">
+        {feedbackNotice && (
+          <div className="flex items-center justify-between text-xs px-4 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs">
             <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-emerald-600" />
-              {enrichmentNotice}
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              {feedbackNotice}
             </span>
             <button
               type="button"
-              onClick={() => setEnrichmentNotice(null)}
-              className="text-emerald-600 hover:text-emerald-900 ml-2"
+              onClick={() => setFeedbackNotice(null)}
+              className="text-indigo-600 hover:text-indigo-900 ml-2"
             >
               ✕
             </button>
           </div>
         )}
 
-        <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-lg">
-          {/* STEP 1: BUSINESS PROFILE & AI MAGIC */}
+        <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-md">
+          {/* PASO 1: TU NEGOCIO (IMPARCIAL Y LIMPIO) */}
           {step === 1 && (
             <>
               <CardHeader>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-indigo-500" />
-                  Paso 1: Tu Negocio y Nicho
+                  Paso 1: ¿Cuál es tu Negocio?
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Indica el nombre y sector. Nuestra IA inferirá precios recomendados, horarios habituales y políticas.
+                  Cuéntanos el nombre y la actividad de tu empresa. Funciona para cualquier sector.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
                 <div className="space-y-1.5">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Nombre de tu Negocio o Empresa
+                    Nombre de tu Empresa o Negocio
                   </label>
                   <Input
                     required
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Ej. Odontología Sonrisas, Barbería Imperial, Nova Abogados..."
+                    placeholder="Ej. Asesorías Martínez, Café La Terraza, Taller Los Andes..."
                     className="h-10 text-xs sm:text-sm"
                   />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Sector o Industria
+                    Sector o Tipo de Actividad
                   </label>
                   <select
                     value={industry}
@@ -425,79 +403,56 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                         {ind}
                       </option>
                     ))}
-                    <option value="Otro">Otro (Especificar)</option>
                   </select>
                 </div>
 
-                {industry === "Otro" && (
+                {industry === "Otro (Especificar libremente)" && (
                   <div className="space-y-1.5">
                     <label className="font-medium text-indigo-600 dark:text-indigo-400">
-                      ¿A qué se dedica tu negocio?
+                      Especifica a qué se dedica tu negocio:
                     </label>
                     <Input
                       required
                       value={customIndustry}
                       onChange={(e) => setCustomIndustry(e.target.value)}
-                      placeholder="Ej. Veterinaria, Gimnasio, Lavandería, Escuela de Conducción..."
+                      placeholder="Ej. Veterinaria, Academia de baile, Empresa de mensajería..."
                       className="h-10 text-xs border-indigo-300 dark:border-indigo-800"
                     />
                   </div>
                 )}
 
-                <div className="space-y-1.5">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    WhatsApp de Atención al Cliente
-                  </label>
-                  <Input
-                    value={whatsappPhone}
-                    onChange={(e) => setWhatsappPhone(e.target.value)}
-                    placeholder="+57 311 000 0000"
-                    className="h-10 text-xs"
-                  />
-                </div>
-
-                {/* AI ENRICHMENT HERO BANNER */}
-                <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200/80 dark:border-indigo-800/60 space-y-2.5">
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <Sparkles className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm">
-                        ¿Quieres ahorrar tiempo y evitar redactar todo a mano?
-                      </p>
-                      <p className="text-zinc-500 dark:text-zinc-400 text-[11px] leading-relaxed mt-0.5">
-                        Nuestra IA estructurará tus servicios con precios reales en COP, horarios típicos para Colombia (incluyendo festivos) y políticas de cancelación con un solo clic.
-                      </p>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
+                      Ciudad o País
+                    </label>
+                    <Input
+                      value={cityOrCountry}
+                      onChange={(e) => setCityOrCountry(e.target.value)}
+                      placeholder="Ej. Bogotá, Colombia"
+                      className="h-9 text-xs"
+                    />
                   </div>
-                  <Button
-                    type="button"
-                    onClick={handleAIEnrich}
-                    disabled={isEnriching || !companyName.trim()}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-10 shadow-xs cursor-pointer font-medium"
-                  >
-                    {isEnriching ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Analizando tu sector y generando catálogo...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        ✨ Autocompletar y Enriquecer con IA
-                      </>
-                    )}
-                  </Button>
+                  <div className="space-y-1.5">
+                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
+                      WhatsApp de Atención
+                    </label>
+                    <Input
+                      value={whatsappPhone}
+                      onChange={(e) => setWhatsappPhone(e.target.value)}
+                      placeholder="+57 300 000 0000"
+                      className="h-9 text-xs"
+                    />
+                  </div>
                 </div>
 
-                <div className="pt-2 flex justify-end">
+                <div className="pt-3 flex justify-end">
                   <Button
                     onClick={() => setStep(2)}
-                    disabled={!companyName.trim() || (industry === "Otro" && !customIndustry.trim())}
-                    className="bg-zinc-800 hover:bg-zinc-700 dark:bg-zinc-200 dark:hover:bg-white text-white dark:text-zinc-900 text-xs h-9 cursor-pointer"
+                    disabled={!companyName.trim() || (industry === "Otro (Especificar libremente)" && !customIndustry.trim())}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
                   >
-                    Continuar Manualmente
+                    Siguiente: Tus Servicios o Productos
                     <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -505,25 +460,25 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
             </>
           )}
 
-          {/* STEP 2: SERVICES & PRICING IN COP */}
+          {/* PASO 2: TUS SERVICIOS O PRODUCTOS (LIMPIO Y EDITABLE) */}
           {step === 2 && (
             <>
               <CardHeader>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <ListPlus className="h-5 w-5 text-indigo-500" />
-                  Paso 2: Catálogo de Servicios y Precios (COP)
+                  Paso 2: ¿Qué Servicios o Productos Ofreces?
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Tu asistente informará estos precios y agendará turnos según la duración de cada servicio.
+                  Agrega los servicios principales que los clientes pueden consultar o agendar.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
-                {/* Active Services List */}
+                {/* Lista de servicios añadidos */}
                 <div className="space-y-2">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Servicios Configurados ({serviceItems.length})
+                    Servicios Registrados ({serviceItems.length})
                   </label>
-                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                     {serviceItems.map((item, idx) => (
                       <div
                         key={idx}
@@ -538,7 +493,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                               <DollarSign className="w-3 h-3" />
                               {item.price_cop
                                 ? `$${Number(item.price_cop).toLocaleString("es-CO")} COP`
-                                : "A cotizar / Gratuita"}
+                                : "Precio según requerimiento"}
                             </span>
                             <span>•</span>
                             <span className="flex items-center gap-1">
@@ -547,30 +502,32 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                             </span>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveService(idx)}
-                          className="h-7 w-7 text-zinc-400 hover:text-red-500 cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {serviceItems.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveService(idx)}
+                            className="h-7 w-7 text-zinc-400 hover:text-red-500 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Add Service Row */}
-                <div className="p-3 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                {/* Formulario rápido para agregar otro servicio */}
+                <div className="p-3 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
                   <p className="font-medium text-zinc-700 dark:text-zinc-300">
-                    + Agregar otro servicio
+                    + Añadir un servicio o producto
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                     <div className="sm:col-span-6">
                       <Input
                         value={newServiceName}
                         onChange={(e) => setNewServiceName(e.target.value)}
-                        placeholder="Nombre del servicio (ej: Blanqueamiento)"
+                        placeholder="Nombre (ej: Asesoría Contable, Corte de cabello...)"
                         className="h-8 text-xs bg-white dark:bg-zinc-950"
                       />
                     </div>
@@ -579,7 +536,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                         type="number"
                         value={newServicePrice}
                         onChange={(e) => setNewServicePrice(e.target.value)}
-                        placeholder="Precio COP (ej: 80000)"
+                        placeholder="Precio COP (opcional)"
                         className="h-8 text-xs bg-white dark:bg-zinc-950"
                       />
                     </div>
@@ -605,7 +562,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                     className="w-full bg-zinc-800 hover:bg-zinc-700 text-white text-xs h-7.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5 mr-1" />
-                    Añadir al catálogo
+                    Añadir al listado
                   </Button>
                 </div>
 
@@ -623,7 +580,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                     disabled={serviceItems.length === 0}
                     className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
                   >
-                    Siguiente: Horarios y Políticas
+                    Siguiente: Horarios y Operación
                     <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -631,20 +588,20 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
             </>
           )}
 
-          {/* STEP 3: SCHEDULES, HOLIDAYS, TOLERANCE & POLICIES (CHIPS) */}
+          {/* PASO 3: HORARIOS, FESTIVOS Y OPERACIÓN */}
           {step === 3 && (
             <>
               <CardHeader>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-indigo-500" />
-                  Paso 3: Horarios, Festivos y Reglas del Negocio
+                  Paso 3: Horarios, Festivos y Reglas
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Configura con un clic cómo opera tu negocio en festivos, tiempos de tolerancia y medios de pago.
+                  Define cómo opera tu negocio para que el asistente no cometa errores de agenda.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
-                {/* Horarios habituales */}
+                {/* Horarios semanales */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
@@ -659,12 +616,12 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                   </div>
                   <div className="space-y-1">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Horario Sábados
+                      Horario Sábados / Fines de Semana
                     </label>
                     <Input
                       value={scheduleSaturdays}
                       onChange={(e) => setScheduleSaturdays(e.target.value)}
-                      placeholder="Sábados: 8:00 AM - 1:00 PM"
+                      placeholder="Sábados: 9:00 AM - 1:00 PM"
                       className="h-9 text-xs"
                     />
                   </div>
@@ -672,13 +629,13 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
 
                 {/* Días Festivos (Chips) */}
                 <div className="space-y-1.5">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
                     ¿Cómo atienden los días festivos?
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
-                      "Solo hasta mediodía (8:00 AM - 1:00 PM)",
                       "Cerrado en días festivos",
+                      "Solo hasta mediodía (8:00 AM - 1:00 PM)",
                       "Atención en jornada habitual",
                     ].map((opt) => (
                       <button
@@ -698,7 +655,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                 </div>
 
                 {/* Tolerancia y Cancelación */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
                       Tolerancia de espera al cliente
@@ -723,7 +680,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
 
                   <div className="space-y-1.5">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Aviso previo para cancelar/reprogramar
+                      Aviso para cancelaciones
                     </label>
                     <select
                       value={cancellationNotice}
@@ -732,17 +689,17 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                     >
                       <option value="Mínimo 2 horas de anticipación">Mínimo 2 horas antes</option>
                       <option value="Mínimo 4 horas de anticipación">Mínimo 4 horas antes</option>
-                      <option value="Mismo día con aviso oportuno">Mismo día con aviso</option>
+                      <option value="Mismo día con aviso oportuno">Mismo día</option>
                       <option value="Mínimo 24 horas de anticipación">24 horas de anticipación</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Medios de Pago Aceptados (Chips Toggles) */}
+                {/* Medios de Pago (Tags) */}
                 <div className="space-y-1.5">
                   <label className="font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                     <CreditCard className="w-3.5 h-3.5 text-zinc-500" />
-                    Medios de pago aceptados (Selecciona los que recibes)
+                    Medios de pago que aceptas
                   </label>
                   <div className="flex flex-wrap gap-1.5">
                     {[
@@ -772,16 +729,16 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                   </div>
                 </div>
 
-                {/* Asistente y Tono */}
+                {/* Asistente */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1">
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Nombre del Asistente
+                      Nombre de tu Asistente
                     </label>
                     <Input
                       value={agentName}
                       onChange={(e) => setAgentName(e.target.value)}
-                      placeholder="Ej. Sofía, Carlos, Valentina..."
+                      placeholder="Ej. Sofía, Carlos, Mateo, Alex..."
                       className="h-8 text-xs"
                     />
                   </div>
@@ -792,7 +749,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                     <Input
                       value={tone}
                       onChange={(e) => setTone(e.target.value)}
-                      placeholder="Ej. Cálido, formal, empático..."
+                      placeholder="Ej. Cercano, profesional, cálido..."
                       className="h-8 text-xs"
                     />
                   </div>
@@ -808,38 +765,47 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                     Atrás
                   </Button>
                   <Button
-                    onClick={handleGoToStep4}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
+                    onClick={handleGenerateWithAI}
+                    disabled={isGeneratingWithAI}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer font-medium"
                   >
-                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    Generar Master Context
-                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    {isGeneratingWithAI ? (
+                      <>
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        Construyendo con IA...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        ✨ Enriquecer y Armar Prompt con IA
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
             </>
           )}
 
-          {/* STEP 4: PROMPT GENERATED & READY */}
+          {/* PASO 4: MASTER CONTEXT CONSTRUIDO POR IA (BASADO EN SUS RESPUESTAS) */}
           {step === 4 && (
             <>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ¡Master Context y Asistente Listos!
+                    Paso 4: Master Context Listo para tu Negocio
                   </CardTitle>
                   <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs">
-                    Optimizado con IA
+                    Optimizado
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
-                  Tu asistente ya tiene el contexto completo: servicios con precios en COP, reglas de festivos y conexión con Google Calendar.
+                  La IA estructuró la información de tu empresa en una guía operativa blindada con reglas de agenda y protocolo de Calendar.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-xs">
                 <Textarea
-                  rows={12}
+                  rows={13}
                   value={generatedPrompt}
                   onChange={(e) => setGeneratedPrompt(e.target.value)}
                   className="text-xs leading-relaxed font-mono bg-zinc-50 dark:bg-zinc-900 resize-y"
@@ -848,10 +814,10 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                 <div className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 space-y-1">
                   <p className="font-semibold flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                    Sincronización con Google Calendar Activa
+                    Protocolo de Google Calendar Incluido
                   </p>
                   <p className="text-[11px] leading-relaxed">
-                    Tu agente consultará disponibilidad y reservará turnos usando el protocolo oficial de Zolution con Google Calendar.
+                    Tu agente ya sabe consultar disponibilidad y registrar citas automáticamente cuando el cliente confirme fecha y hora.
                   </p>
                 </div>
 
@@ -862,7 +828,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                     className="text-xs h-9 cursor-pointer"
                   >
                     <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                    Volver a Editar
+                    Ajustar Datos
                   </Button>
                   <Button
                     onClick={handleFinishOnboarding}
@@ -872,7 +838,7 @@ Escala al equipo si el cliente tiene una consulta fuera de catálogo o solicita 
                     {isSavingFinish ? (
                       <>
                         <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Guardando y Activando...
+                        Guardando...
                       </>
                     ) : (
                       <>

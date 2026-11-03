@@ -173,9 +173,15 @@ export default function AgentConfigPage() {
         localStorage.setItem("zolution_agent_prompt", res.recommended_system_prompt);
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 3000);
+        return;
       }
     } catch {
-      handleResetToDefault();
+      // Si la API remota está desplegando o no responde, genera el Master Context localmente
+      const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry);
+      setPrompt(freshPrompt);
+      localStorage.setItem("zolution_agent_prompt", freshPrompt);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
     } finally {
       setIsEnrichingPrompt(false);
     }
