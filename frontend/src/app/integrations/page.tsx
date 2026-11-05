@@ -51,11 +51,9 @@ function IntegrationsContent() {
   } | null>(null);
 
   const [copiedWebhook, setCopiedWebhook] = useState(false);
-  const [copiedToken, setCopiedToken] = useState(false);
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://zolution-api.onrender.com/api/v1";
   const webhookUrl = `${apiBase.replace(/\/+$/, "")}/webhooks/whatsapp`;
-  const verifyToken = "zol_verify_sec_9941a";
 
   const loadIntegrationStatus = async () => {
     setIsCheckingStatus(true);
@@ -109,15 +107,10 @@ function IntegrationsContent() {
     return () => window.removeEventListener("storage", syncContext);
   }, [searchParams]);
 
-  const handleCopy = (text: string, type: "webhook" | "token") => {
-    navigator.clipboard.writeText(text);
-    if (type === "webhook") {
-      setCopiedWebhook(true);
-      setTimeout(() => setCopiedWebhook(false), 2000);
-    } else {
-      setCopiedToken(true);
-      setTimeout(() => setCopiedToken(false), 2000);
-    }
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
   };
 
   const handleGoogleOAuthConnect = async () => {
@@ -416,35 +409,10 @@ function IntegrationsContent() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleCopy(webhookUrl, "webhook")}
+                    onClick={handleCopyWebhook}
                     className="h-9 shrink-0 cursor-pointer"
                   >
                     {copiedWebhook ? (
-                      <Check className="h-4 w-4 text-emerald-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  {lang === "en" ? "Verification Key" : "Clave de Verificación"}
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    readOnly
-                    value={verifyToken}
-                    className="text-xs h-9 bg-zinc-50 dark:bg-zinc-900"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCopy(verifyToken, "token")}
-                    className="h-9 shrink-0 cursor-pointer"
-                  >
-                    {copiedToken ? (
                       <Check className="h-4 w-4 text-emerald-500" />
                     ) : (
                       <Copy className="h-4 w-4" />

@@ -65,7 +65,7 @@ function LoginContent() {
     const savedState = sessionStorage.getItem("zolution_oauth_state");
     sessionStorage.removeItem("zolution_oauth_state");
 
-    if (savedState && returnedState && returnedState !== savedState) {
+    if (!savedState || returnedState !== savedState) {
       setErrorMessage(
         "Error de seguridad: La firma de estado de Google no coincide. Intenta de nuevo."
       );
