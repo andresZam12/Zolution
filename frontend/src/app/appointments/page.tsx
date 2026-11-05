@@ -215,6 +215,30 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleDeleteAppointment = async (apt: ExtendedAppointmentItem) => {
+    const confirmMsg =
+      lang === "en"
+        ? "Permanently delete this appointment? It will also be removed from Google Calendar."
+        : "¿Eliminar esta cita definitivamente? También se quitará de Google Calendar.";
+    if (!window.confirm(confirmMsg)) return;
+
+    if (isFromDb) {
+      try {
+        await apiFetch(`/appointments/${apt.id}`, { method: "DELETE" });
+      } catch (err: unknown) {
+        window.alert(
+          err instanceof Error
+            ? err.message
+            : lang === "en"
+              ? "The appointment could not be deleted."
+              : "No se pudo eliminar la cita."
+        );
+        return;
+      }
+    }
+    setAppointments((prev) => prev.filter((item) => item.id !== apt.id));
+  };
+
   const handleCancelAppointment = async (apt: ExtendedAppointmentItem) => {
     const confirmMsg =
       lang === "en"
@@ -418,6 +442,15 @@ export default function AppointmentsPage() {
                       <Ban className="w-3.5 h-3.5" />
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAppointment(apt)}
+                    className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                    aria-label={lang === "en" ? "Delete appointment" : "Eliminar cita"}
+                    title={lang === "en" ? "Delete appointment" : "Eliminar cita"}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </CardHeader>
