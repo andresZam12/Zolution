@@ -307,7 +307,7 @@ function IntegrationsContent() {
                     {lang === "en" ? "Last synced:" : "Última sincronización:"}
                   </span>
                   <span className="text-zinc-700 dark:text-zinc-300 text-[11px]">
-                    {new Date(lastUpdated).toLocaleString("es-CO")}
+                    {new Date(lastUpdated).toLocaleString("es-CO", { hour12: true })}
                   </span>
                 </div>
               )}

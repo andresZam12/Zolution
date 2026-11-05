@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
+import { fromTime12h, Time12h, toTime12h } from "@/lib/time";
 import {
   getTenantContext,
   getTenantAppointments,
@@ -28,6 +29,11 @@ import {
   TenantContext,
   AppLanguage,
 } from "@/lib/tenant";
+
+const HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1);
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, index) => index * 5);
+const TIME_SELECT_CLASS =
+  "h-9 w-full rounded-md border border-input bg-transparent px-1 text-xs dark:bg-zinc-900";
 
 interface ExtendedAppointmentItem extends AppointmentItem {
   htmlLink?: string | null;
@@ -59,6 +65,9 @@ export default function AppointmentsPage() {
     () => new Date().toISOString().split("T")[0]
   );
   const [appointmentTime, setAppointmentTime] = useState("10:00");
+  const selectedTime = toTime12h(appointmentTime);
+  const updateTime = (change: Partial<Time12h>) =>
+    setAppointmentTime(fromTime12h({ ...selectedTime, ...change }));
   const [serviceName, setServiceName] = useState("Reunión de Consulta");
   const [feedbackMsg, setFeedbackMsg] = useState<{
     type: "success" | "error";
@@ -537,13 +546,41 @@ export default function AppointmentsPage() {
                     <label className="font-medium text-zinc-700 dark:text-zinc-300">
                       {lang === "en" ? "Time" : "Hora"}
                     </label>
-                    <Input
-                      type="time"
-                      required
-                      value={appointmentTime}
-                      onChange={(e) => setAppointmentTime(e.target.value)}
-                      className="h-9 text-xs"
-                    />
+                    <div className="flex items-center gap-1">
+                      <select
+                        aria-label={lang === "en" ? "Hour" : "Hora"}
+                        value={selectedTime.hour}
+                        onChange={(e) => updateTime({ hour: Number(e.target.value) })}
+                        className={TIME_SELECT_CLASS}
+                      >
+                        {HOUR_OPTIONS.map((hour) => (
+                          <option key={hour} value={hour}>
+                            {hour}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label={lang === "en" ? "Minutes" : "Minutos"}
+                        value={selectedTime.minute}
+                        onChange={(e) => updateTime({ minute: Number(e.target.value) })}
+                        className={TIME_SELECT_CLASS}
+                      >
+                        {MINUTE_OPTIONS.map((minute) => (
+                          <option key={minute} value={minute}>
+                            {String(minute).padStart(2, "0")}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="AM / PM"
+                        value={selectedTime.period}
+                        onChange={(e) => updateTime({ period: e.target.value as Time12h["period"] })}
+                        className={TIME_SELECT_CLASS}
+                      >
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 

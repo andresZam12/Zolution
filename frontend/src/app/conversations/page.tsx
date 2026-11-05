@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
+import { formatTime12h } from "@/lib/time";
 import {
   getTenantContext,
   getTenantConversations,
@@ -68,10 +69,7 @@ export default function ConversationsPage() {
           customerName: item.customer_name || "Cliente WhatsApp",
           phone: item.customer_phone,
           lastMessage: item.last_message?.content || "Sin mensajes",
-          time: new Date(item.updated_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          time: formatTime12h(item.updated_at),
           status: item.status,
           messages: [],
         }));
@@ -92,10 +90,7 @@ export default function ConversationsPage() {
               id: m.id,
               role: m.role,
               content: m.content,
-              time: new Date(m.created_at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
+              time: formatTime12h(m.created_at),
             }));
           }
         } catch {
@@ -140,10 +135,7 @@ export default function ConversationsPage() {
             id: m.id,
             role: m.role,
             content: m.content,
-            time: new Date(m.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+            time: formatTime12h(m.created_at),
           }));
           setSelectedConv((prev) => (prev ? { ...prev, messages: formattedMessages } : null));
         }
