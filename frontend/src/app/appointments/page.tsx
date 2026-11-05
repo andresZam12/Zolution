@@ -23,7 +23,6 @@ import { apiFetch } from "@/lib/api";
 import { fromTime12h, Time12h, toTime12h } from "@/lib/time";
 import {
   getTenantContext,
-  getTenantAppointments,
   getAppLanguage,
   AppointmentItem,
   TenantContext,
@@ -49,7 +48,7 @@ export default function AppointmentsPage() {
     email: "admin@zolution.ai",
   });
   const [appointments, setAppointments] = useState<ExtendedAppointmentItem[]>([]);
-  const [isFromDb, setIsFromDb] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "confirmed" | "completed">("all");
   const [modalOpen, setModalOpen] = useState(false);
@@ -90,16 +89,11 @@ export default function AppointmentsPage() {
         total: number;
       }>("/appointments");
 
-      if (res && Array.isArray(res.items) && res.items.length > 0) {
-        setAppointments(res.items);
-        setIsFromDb(true);
-      } else {
-        setAppointments(getTenantAppointments(ctx.name, ctx.industry));
-        setIsFromDb(false);
-      }
+      setAppointments(res.items);
+      setLoadFailed(false);
     } catch {
-      setAppointments(getTenantAppointments(ctx.name, ctx.industry));
-      setIsFromDb(false);
+      setAppointments([]);
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -173,8 +167,7 @@ export default function AppointmentsPage() {
       });
 
       if (res.appointment) {
-        setAppointments((prev) => (isFromDb ? [res.appointment!, ...prev] : [res.appointment!]));
-        setIsFromDb(true);
+        setAppointments((prev) => [res.appointment!, ...prev]);
       }
 
       setTimeout(() => {
@@ -198,22 +191,32 @@ export default function AppointmentsPage() {
     }
   };
 
-  const handleToggleComplete = async (apt: ExtendedAppointmentItem) => {
-    const nextStatus = apt.status === "confirmed" ? "completed" : "confirmed";
-    setAppointments((prev) =>
-      prev.map((item) => (item.id === apt.id ? { ...item, status: nextStatus } : item))
-    );
-    if (isFromDb) {
-      try {
-        await apiFetch(`/appointments/${apt.id}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: nextStatus }),
-        });
-      } catch {
-        // Keep optimistic UI
-      }
+  const showActionError = (err: unknown, fallback: { en: string; es: string }) => {
+    window.alert(err instanceof Error ? err.message : lang === "en" ? fallback.en : fallback.es);
+  };
+
+  const updateStatus = async (
+    apt: ExtendedAppointmentItem,
+    status: ExtendedAppointmentItem["status"]
+  ) => {
+    try {
+      await apiFetch(`/appointments/${apt.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      setAppointments((prev) =>
+        prev.map((item) => (item.id === apt.id ? { ...item, status } : item))
+      );
+    } catch (err: unknown) {
+      showActionError(err, {
+        en: "The appointment could not be updated.",
+        es: "No se pudo actualizar la cita.",
+      });
     }
   };
+
+  const handleToggleComplete = (apt: ExtendedAppointmentItem) =>
+    updateStatus(apt, apt.status === "confirmed" ? "completed" : "confirmed");
 
   const handleDeleteAppointment = async (apt: ExtendedAppointmentItem) => {
     const confirmMsg =
@@ -222,43 +225,23 @@ export default function AppointmentsPage() {
         : "¿Eliminar esta cita definitivamente? También se quitará de Google Calendar.";
     if (!window.confirm(confirmMsg)) return;
 
-    if (isFromDb) {
-      try {
-        await apiFetch(`/appointments/${apt.id}`, { method: "DELETE" });
-      } catch (err: unknown) {
-        window.alert(
-          err instanceof Error
-            ? err.message
-            : lang === "en"
-              ? "The appointment could not be deleted."
-              : "No se pudo eliminar la cita."
-        );
-        return;
-      }
+    try {
+      await apiFetch(`/appointments/${apt.id}`, { method: "DELETE" });
+      setAppointments((prev) => prev.filter((item) => item.id !== apt.id));
+    } catch (err: unknown) {
+      showActionError(err, {
+        en: "The appointment could not be deleted.",
+        es: "No se pudo eliminar la cita.",
+      });
     }
-    setAppointments((prev) => prev.filter((item) => item.id !== apt.id));
   };
 
-  const handleCancelAppointment = async (apt: ExtendedAppointmentItem) => {
+  const handleCancelAppointment = (apt: ExtendedAppointmentItem) => {
     const confirmMsg =
       lang === "en"
-        ? "¿Are you sure you want to cancel this appointment? It will be removed from Google Calendar."
+        ? "Are you sure you want to cancel this appointment? It will be removed from Google Calendar."
         : "¿Seguro que deseas cancelar esta cita? Se desocupará y eliminará de Google Calendar.";
-    if (!window.confirm(confirmMsg)) return;
-
-    setAppointments((prev) =>
-      prev.map((item) => (item.id === apt.id ? { ...item, status: "cancelled" } : item))
-    );
-    if (isFromDb) {
-      try {
-        await apiFetch(`/appointments/${apt.id}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: "cancelled" }),
-        });
-      } catch {
-        // Keep optimistic UI
-      }
-    }
+    if (window.confirm(confirmMsg)) updateStatus(apt, "cancelled");
   };
 
   const filteredAppointments = appointments.filter((apt) =>
@@ -378,6 +361,18 @@ export default function AppointmentsPage() {
           </div>
         )}
       </Card>
+
+      {filteredAppointments.length === 0 && !isLoading && (
+        <p className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+          {loadFailed
+            ? lang === "en"
+              ? "Appointments could not be loaded. Please try again."
+              : "No se pudieron cargar las citas. Intenta de nuevo."
+            : lang === "en"
+              ? "There are no appointments here yet."
+              : "Todavía no hay citas aquí."}
+        </p>
+      )}
 
       {/* Appointments Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

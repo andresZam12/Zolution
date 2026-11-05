@@ -8,7 +8,6 @@ import {
   MessageSquare,
   TrendingUp,
   CheckCircle2,
-  Clock,
   Sparkles,
   ArrowUpRight,
   Send,
@@ -17,19 +16,24 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
+import { formatTime12h } from "@/lib/time";
 import {
   getTenantContext,
-  getTenantEvents,
   getAppLanguage,
   formatToolLabel,
   TenantContext,
-  ActivityEvent,
   AppLanguage,
 } from "@/lib/tenant";
+
+interface RecentConversation {
+  id: string;
+  customer: string;
+  lastMessage: string;
+  time: string;
+}
 
 interface QuickSimMessage {
   id: string;
@@ -47,10 +51,10 @@ export default function OverviewPage() {
     industry: "Servicios",
     email: "admin@zolution.ai",
   });
-  const [recentEvents, setRecentEvents] = useState<ActivityEvent[]>([]);
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [convCount, setConvCount] = useState<number | null>(null);
   const [aptCount, setAptCount] = useState<number | null>(null);
-  const [googleConnected, setGoogleConnected] = useState<boolean>(true);
+  const [googleConnected, setGoogleConnected] = useState<boolean>(false);
 
   // Quick Agent Simulator Modal state
   const [simOpen, setSimOpen] = useState(false);
@@ -64,23 +68,39 @@ export default function OverviewPage() {
       const currentLang = getAppLanguage();
       setTenant(ctx);
       setLang(currentLang);
-      setRecentEvents(getTenantEvents(ctx.name, ctx.industry));
       setSimMessages([]);
     };
 
     refreshTenant();
 
     Promise.all([
-      apiFetch<{ total?: number }>("/conversations").catch(() => null),
+      apiFetch<{
+        total?: number;
+        items?: Array<{
+          id: string;
+          customer_name: string | null;
+          customer_phone: string;
+          updated_at: string;
+          last_message: { content: string; created_at: string } | null;
+        }>;
+      }>("/conversations").catch(() => null),
       apiFetch<{ total?: number }>("/appointments").catch(() => null),
       apiFetch<Array<{ provider: string; is_connected: boolean }>>("/integrations/status").catch(
         () => null
       ),
     ]).then(([convRes, aptRes, intRes]) => {
-      if (convRes && typeof convRes.total === "number" && convRes.total > 0) {
+      if (convRes && typeof convRes.total === "number") {
         setConvCount(convRes.total);
+        setRecentConversations(
+          (convRes.items || []).slice(0, 5).map((item) => ({
+            id: item.id,
+            customer: item.customer_name || item.customer_phone,
+            lastMessage: item.last_message?.content || "",
+            time: formatTime12h(item.last_message?.created_at || item.updated_at),
+          }))
+        );
       }
-      if (aptRes && typeof aptRes.total === "number" && aptRes.total > 0) {
+      if (aptRes && typeof aptRes.total === "number") {
         setAptCount(aptRes.total);
       }
       if (Array.isArray(intRes)) {
@@ -149,31 +169,17 @@ export default function OverviewPage() {
   const stats = [
     {
       title: lang === "en" ? "Conversations" : "Conversaciones",
-      value: convCount !== null ? String(convCount) : "142",
-      change: lang === "en" ? "+18% this week" : "+18% esta semana",
+      value: convCount !== null ? String(convCount) : "—",
+      change: lang === "en" ? "Customers who wrote to you" : "Clientes que te han escrito",
       icon: MessageSquare,
       color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40",
     },
     {
       title: lang === "en" ? "Appointments" : "Citas",
-      value: aptCount !== null ? String(aptCount) : "38",
-      change: lang === "en" ? "Synced with your calendar" : "Sincronizadas en tu agenda",
+      value: aptCount !== null ? String(aptCount) : "—",
+      change: lang === "en" ? "Registered in your agenda" : "Registradas en tu agenda",
       icon: Calendar,
       color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40",
-    },
-    {
-      title: lang === "en" ? "Resolution Rate" : "Tasa de Resolución",
-      value: "94.2%",
-      change: lang === "en" ? "Answered automatically" : "Atendidas sin esperas",
-      icon: Sparkles,
-      color: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40",
-    },
-    {
-      title: lang === "en" ? "Response Time" : "Tiempo de Respuesta",
-      value: "1.4s",
-      change: lang === "en" ? "Instant attention 24/7" : "Atención inmediata 24/7",
-      icon: Clock,
-      color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40",
     },
   ];
 
@@ -218,7 +224,7 @@ export default function OverviewPage() {
       </div>
 
       {/* 4 Focal Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -272,44 +278,37 @@ export default function OverviewPage() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recentEvents.map((event) => {
-              const naturalLabel = formatToolLabel(event.tool, lang);
-              return (
+            {recentConversations.length === 0 ? (
+              <p className="p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                {lang === "en"
+                  ? "Your customers' conversations will appear here."
+                  : "Aquí aparecerán las conversaciones de tus clientes."}
+              </p>
+            ) : (
+              recentConversations.map((conversation) => (
                 <div
-                  key={event.id}
-                  className="flex items-start justify-between p-3.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-800/30 border border-zinc-100 dark:border-zinc-800/60 transition-colors"
+                  key={conversation.id}
+                  className="flex items-start justify-between gap-3 p-3.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-800/40"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 font-semibold text-xs">
-                      {event.customer.slice(0, 2).toUpperCase()}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="mt-0.5 w-8 h-8 shrink-0 rounded-full bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                      {conversation.customer.slice(0, 2).toUpperCase()}
                     </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                          {event.customer}
-                        </p>
-                        <Badge
-                          variant="secondary"
-                          className="text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-0"
-                        >
-                          {naturalLabel}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-                        {event.action}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {conversation.customer}
+                      </p>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 truncate">
+                        {conversation.lastMessage}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xs text-zinc-400 dark:text-zinc-500">{event.time}</span>
-                    <div className="flex items-center justify-end gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      <span>{lang === "en" ? "Completed" : "Atendido"}</span>
-                    </div>
-                  </div>
+                  <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">
+                    {conversation.time}
+                  </span>
                 </div>
-              );
-            })}
+              ))
+            )}
           </CardContent>
         </Card>
 

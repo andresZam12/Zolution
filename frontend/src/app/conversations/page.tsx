@@ -18,7 +18,6 @@ import { apiFetch } from "@/lib/api";
 import { formatTime12h } from "@/lib/time";
 import {
   getTenantContext,
-  getTenantConversations,
   getAppLanguage,
   formatToolLabel,
   ConversationSummary,
@@ -39,7 +38,7 @@ export default function ConversationsPage() {
   const [selectedConv, setSelectedConv] = useState<ConversationSummary | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isLiveApi, setIsLiveApi] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadConversations = async () => {
     setIsLoading(true);
@@ -47,8 +46,6 @@ export default function ConversationsPage() {
     const currentLang = getAppLanguage();
     setTenant(ctx);
     setLang(currentLang);
-
-    const initialDemos = getTenantConversations(ctx.name, ctx.industry);
 
     try {
       const data = await apiFetch<{
@@ -74,7 +71,6 @@ export default function ConversationsPage() {
           messages: [],
         }));
         setConversations(mapped);
-        setIsLiveApi(true);
 
         try {
           const firstDetail = await apiFetch<{
@@ -98,14 +94,14 @@ export default function ConversationsPage() {
         }
         setSelectedConv({ ...mapped[0] });
       } else {
-        setConversations(initialDemos);
-        setSelectedConv(initialDemos[0] || null);
-        setIsLiveApi(false);
+        setConversations([]);
+        setSelectedConv(null);
       }
+      setLoadFailed(false);
     } catch {
-      setConversations(initialDemos);
-      setSelectedConv(initialDemos[0] || null);
-      setIsLiveApi(false);
+      setConversations([]);
+      setSelectedConv(null);
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -119,29 +115,27 @@ export default function ConversationsPage() {
 
   const handleSelectConversation = async (conv: ConversationSummary) => {
     setSelectedConv(conv);
-    if (isLiveApi) {
-      try {
-        const detail = await apiFetch<{
-          messages: Array<{
-            id: string;
-            role: "user" | "assistant";
-            content: string;
-            created_at: string;
-          }>;
-        }>(`/conversations/${conv.id}`);
+    try {
+      const detail = await apiFetch<{
+        messages: Array<{
+          id: string;
+          role: "user" | "assistant";
+          content: string;
+          created_at: string;
+        }>;
+      }>(`/conversations/${conv.id}`);
 
-        if (detail && detail.messages) {
-          const formattedMessages = detail.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            time: formatTime12h(m.created_at),
-          }));
-          setSelectedConv((prev) => (prev ? { ...prev, messages: formattedMessages } : null));
-        }
-      } catch {
-        // Keep current messages
+      if (detail && detail.messages) {
+        const formattedMessages = detail.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          time: formatTime12h(m.created_at),
+        }));
+        setSelectedConv((prev) => (prev ? { ...prev, messages: formattedMessages } : null));
       }
+    } catch {
+      // Keep current messages
     }
   };
 
@@ -211,9 +205,13 @@ export default function ConversationsPage() {
               <div className="p-8 text-center text-zinc-400 space-y-2">
                 <MessageSquare className="w-8 h-8 mx-auto text-zinc-300" />
                 <p className="text-xs">
-                  {lang === "en"
-                    ? `No conversations found for ${tenant.name}.`
-                    : `No hay conversaciones registradas para ${tenant.name}.`}
+                  {loadFailed
+                    ? lang === "en"
+                      ? "Conversations could not be loaded. Please try again."
+                      : "No se pudieron cargar las conversaciones. Intenta de nuevo."
+                    : lang === "en"
+                      ? `No conversations found for ${tenant.name}.`
+                      : `No hay conversaciones registradas para ${tenant.name}.`}
                 </p>
               </div>
             ) : (
