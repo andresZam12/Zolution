@@ -167,33 +167,25 @@ export default function AppointmentsPage() {
         setAppointments((prev) => (isFromDb ? [res.appointment!, ...prev] : [res.appointment!]));
         setIsFromDb(true);
       }
-    } catch {
-      const fallbackApt: ExtendedAppointmentItem = {
-        id: `apt-${Date.now()}`,
-        patientName,
-        phone: patientPhone,
-        service: serviceName,
-        date: appointmentDate,
-        time: `${appointmentTime} (45 min)`,
-        status: "confirmed",
-        googleEventId: `local_evt_${Math.random().toString(36).substring(2, 8)}`,
-      };
-      setAppointments((prev) => [fallbackApt, ...prev]);
-      setFeedbackMsg({
-        type: "success",
-        text:
-          lang === "en"
-            ? `Appointment scheduled for ${tenant.name}.`
-            : `Cita agendada en el calendario de ${tenant.name}.`,
-      });
-    } finally {
-      setIsSubmitting(false);
+
       setTimeout(() => {
         setModalOpen(false);
         setFeedbackMsg(null);
         setPatientName("");
         setPatientPhone("");
       }, 1500);
+    } catch (err: unknown) {
+      setFeedbackMsg({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : lang === "en"
+              ? "The appointment could not be scheduled."
+              : "No se pudo agendar la cita.",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
