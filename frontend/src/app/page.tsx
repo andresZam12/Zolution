@@ -8,6 +8,7 @@ import {
   MessageSquare,
   TrendingUp,
   CheckCircle2,
+  Clock,
   Sparkles,
   ArrowUpRight,
   Send,
@@ -27,6 +28,13 @@ import {
   TenantContext,
   AppLanguage,
 } from "@/lib/tenant";
+
+interface OverviewMetrics {
+  new_conversations_7d: number;
+  measured_replies: number;
+  resolution_rate: number | null;
+  avg_response_seconds: number | null;
+}
 
 interface RecentConversation {
   id: string;
@@ -54,6 +62,7 @@ export default function OverviewPage() {
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [convCount, setConvCount] = useState<number | null>(null);
   const [aptCount, setAptCount] = useState<number | null>(null);
+  const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
   const [googleConnected, setGoogleConnected] = useState<boolean>(false);
 
   // Quick Agent Simulator Modal state
@@ -88,7 +97,9 @@ export default function OverviewPage() {
       apiFetch<Array<{ provider: string; is_connected: boolean }>>("/integrations/status").catch(
         () => null
       ),
-    ]).then(([convRes, aptRes, intRes]) => {
+      apiFetch<OverviewMetrics>("/analytics/overview").catch(() => null),
+    ]).then(([convRes, aptRes, intRes, metricsRes]) => {
+      setMetrics(metricsRes);
       if (convRes && typeof convRes.total === "number") {
         setConvCount(convRes.total);
         setRecentConversations(
@@ -166,11 +177,25 @@ export default function OverviewPage() {
     }
   };
 
+  const measuredLabel = metrics?.measured_replies
+    ? lang === "en"
+      ? `Out of ${metrics.measured_replies} replies, last 30 days`
+      : `De ${metrics.measured_replies} respuestas, últimos 30 días`
+    : lang === "en"
+      ? "Measured from your next messages"
+      : "Se mide desde tus próximos mensajes";
+
   const stats = [
     {
       title: lang === "en" ? "Conversations" : "Conversaciones",
       value: convCount !== null ? String(convCount) : "—",
-      change: lang === "en" ? "Customers who wrote to you" : "Clientes que te han escrito",
+      change: metrics
+        ? lang === "en"
+          ? `${metrics.new_conversations_7d} new this week`
+          : `${metrics.new_conversations_7d} nuevas esta semana`
+        : lang === "en"
+          ? "Customers who wrote to you"
+          : "Clientes que te han escrito",
       icon: MessageSquare,
       color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40",
     },
@@ -180,6 +205,20 @@ export default function OverviewPage() {
       change: lang === "en" ? "Registered in your agenda" : "Registradas en tu agenda",
       icon: Calendar,
       color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40",
+    },
+    {
+      title: lang === "en" ? "Resolution Rate" : "Tasa de Resolución",
+      value: metrics?.resolution_rate != null ? `${metrics.resolution_rate}%` : "—",
+      change: measuredLabel,
+      icon: Sparkles,
+      color: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40",
+    },
+    {
+      title: lang === "en" ? "Response Time" : "Tiempo de Respuesta",
+      value: metrics?.avg_response_seconds != null ? `${metrics.avg_response_seconds} s` : "—",
+      change: lang === "en" ? "Average, last 30 days" : "Promedio, últimos 30 días",
+      icon: Clock,
+      color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40",
     },
   ];
 
@@ -224,7 +263,7 @@ export default function OverviewPage() {
       </div>
 
       {/* 4 Focal Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
