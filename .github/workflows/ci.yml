@@ -42,7 +42,6 @@ jobs:
 
       - name: Run Mypy (type checking)
         run: mypy app/ --ignore-missing-imports --no-error-summary
-        # Will report errors but not fail the build until app code exists
         continue-on-error: true
 
   # ---------------------------------------------------------------------------
@@ -82,17 +81,17 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      # Production's role owns the tables without being a superuser, and RLS
+      # only proves anything under that same condition.
+      - name: Create application role
+        env:
+          PGPASSWORD: test_password
         run: |
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            echo "No requirements.txt yet — skipping install"
-          fi
-          if [ -f requirements-dev.txt ]; then
-            pip install -r requirements-dev.txt
-          else
-            echo "No requirements-dev.txt yet — skipping install"
-          fi
+          psql -h localhost -U zolution -d postgres \
+            -c "CREATE ROLE zolution_app LOGIN PASSWORD 'test_password' NOSUPERUSER NOBYPASSRLS" \
+            -c "CREATE DATABASE zolution_rls OWNER zolution_app"
 
       - name: Run tests
         env:
@@ -102,15 +101,11 @@ jobs:
           DATABASE_USER: zolution
           DATABASE_PASSWORD: test_password
           APP_ENV: test
-        run: |
-          if [ -f requirements.txt ] && python -c "import pytest" 2>/dev/null; then
-            pytest tests/ -v --tb=short
-          else
-            echo "No test dependencies yet — skipping tests"
-          fi
+          TEST_DATABASE_URL: postgresql+asyncpg://zolution_app:test_password@localhost:5432/zolution_rls
+        run: pytest tests/ -v --tb=short
 
   # ---------------------------------------------------------------------------
-  # Frontend — Angular build check
+  # Frontend — Next.js build check
   # ---------------------------------------------------------------------------
   frontend-build:
     name: Frontend — Build Check
@@ -127,32 +122,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          # Only enable npm cache when package-lock.json exists to avoid
-          # the "Dependencies file is not found" error on empty frontend
-          cache: ${{ hashFiles('frontend/package-lock.json') != '' && 'npm' || '' }}
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: |
-          if [ -f package.json ]; then
-            npm ci --prefer-offline
-          else
-            echo "No package.json yet — skipping install"
-          fi
+        run: npm ci --prefer-offline
 
       - name: Lint
-        run: |
-          if [ -f package.json ] && grep -q '"lint"' package.json 2>/dev/null; then
-            npm run lint
-          else
-            echo "No lint script yet — skipping"
-          fi
+        run: npm run lint
         continue-on-error: true
 
       - name: Build
-        run: |
-          if [ -f package.json ] && grep -q '"build"' package.json 2>/dev/null; then
-            npm run build -- --configuration=production
-          else
-            echo "No package.json yet — skipping build"
-          fi
+        run: npm run build
