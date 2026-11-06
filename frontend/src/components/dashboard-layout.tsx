@@ -20,6 +20,7 @@ import {
   Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WhatsAppContactButton } from "@/components/whatsapp-contact-button";
 import { apiFetch } from "@/lib/api";
 import { AppLanguage, getAppLanguage } from "@/lib/tenant";
 
@@ -443,6 +444,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </main>
+
+      <WhatsAppContactButton lang={lang} businessName={orgName} />
 
       {/* Mobile Backdrop */}
       {mobileMenuOpen && (
