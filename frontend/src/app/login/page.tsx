@@ -24,7 +24,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] = useState(searchParams.get("registro") === "1");
   const [regStep, setRegStep] = useState<1 | 2>(1); // 1: Datos, 2: Código OTP
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
