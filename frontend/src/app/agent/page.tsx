@@ -2,23 +2,33 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Bot,
-  Sparkles,
-  Save,
-  RotateCcw,
-  Sliders,
-  CheckCircle2,
   AlertTriangle,
-  Send,
-  User,
+  CalendarCheck2,
+  CalendarSync,
+  CheckCircle2,
+  PenLine,
   RefreshCw,
+  RotateCcw,
+  Save,
+  Send,
+  Sparkles,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { WhatsAppIcon } from "@/components/brand-icons";
+import { ZabioMark } from "@/components/zabio-logo";
+import {
+  EmptyState,
+  Notice,
+  PageHeader,
+  Rise,
+  SectionCard,
+  StatusPill,
+  TypingDots,
+  useAutoScroll,
+} from "@/components/zabio-ui";
 import { apiFetch } from "@/lib/api";
 import {
   getTenantContext,
@@ -52,6 +62,8 @@ export default function AgentConfigPage() {
   const [isActive, setIsActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [templateRestored, setTemplateRestored] = useState(false);
 
   const [prompt, setPrompt] = useState("");
 
@@ -60,6 +72,7 @@ export default function AgentConfigPage() {
   const [inputMessage, setInputMessage] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
   const [llmNotice, setLlmNotice] = useState<string | null>(null);
+  const simScrollRef = useAutoScroll(chatMessages.length + (isSimulating ? 1 : 0));
 
   const loadAgentConfig = async () => {
     const ctx = getTenantContext();
@@ -126,6 +139,7 @@ export default function AgentConfigPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveFailed(false);
     localStorage.setItem("zolution_agent_prompt", prompt);
 
     try {
@@ -138,12 +152,12 @@ export default function AgentConfigPage() {
           status: isActive ? "active" : "draft",
         }),
       });
-    } catch {
-      // Fallback local
-    } finally {
-      setIsSaving(false);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
+    } catch {
+      setSaveFailed(true);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -151,8 +165,7 @@ export default function AgentConfigPage() {
     const freshPrompt = generateDefaultPrompt(tenant.name, tenant.industry);
     setPrompt(freshPrompt);
     localStorage.setItem("zolution_agent_prompt", freshPrompt);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setTemplateRestored(true);
   };
 
   const [simulatorSessionId, setSimulatorSessionId] = useState<string>(() =>
@@ -239,17 +252,17 @@ export default function AgentConfigPage() {
       let actionLabel = simRes.tool_called ? formatToolLabel(simRes.tool_called, lang) : undefined;
       let actionType: "success" | "warning" = "success";
       if (simRes.tool_called?.includes("cancel_appointment")) {
-        actionLabel = lang === "en" ? "🗑️ Cancelled in Google Calendar" : "🗑️ Cita cancelada en Google Calendar";
+        actionLabel = lang === "en" ? "Cancelled in Google Calendar" : "Cita cancelada en Google Calendar";
         actionType = "warning";
       } else if (simRes.tool_called?.includes("reschedule_appointment")) {
-        actionLabel = lang === "en" ? "🔄 Rescheduled in Google Calendar" : "🔄 Cita actualizada en Google Calendar";
+        actionLabel = lang === "en" ? "Rescheduled in Google Calendar" : "Cita actualizada en Google Calendar";
         actionType = "success";
       } else if (simRes.appointment_created) {
         if (simRes.google_calendar_synced) {
-          actionLabel = lang === "en" ? "📅 Booked in Google Calendar" : "📅 Cita creada en Google Calendar";
+          actionLabel = lang === "en" ? "Booked in Google Calendar" : "Cita creada en Google Calendar";
           actionType = "success";
         } else {
-          actionLabel = lang === "en" ? "📝 Saved in Zolution (Calendar unsynced)" : "📝 Guardada en Zolution (Calendar sin sincronizar)";
+          actionLabel = lang === "en" ? "Saved in Zabio (not in Calendar)" : "Guardada en Zabio (no llegó a Calendar)";
           actionType = "warning";
           const calErr = simRes.llm_errors?.find((e) => e.includes("Google Calendar"));
           if (calErr) {
@@ -277,8 +290,8 @@ export default function AgentConfigPage() {
           role: "assistant",
           content:
             lang === "en"
-              ? `⚠️ I couldn't reach the assistant service right now. ${detail ? `(${detail})` : ""} Please try again in a few seconds.`
-              : `⚠️ No pude conectar con el servicio del asistente en este momento. ${detail ? `(${detail})` : ""} Intenta de nuevo en unos segundos.`,
+              ? `I couldn't reach your agent right now. ${detail ? `(${detail})` : ""} Please try again in a few seconds.`
+              : `No pude conectar con tu agente en este momento. ${detail ? `(${detail})` : ""} Intenta de nuevo en unos segundos.`,
         },
       ]);
     } finally {
@@ -286,316 +299,273 @@ export default function AgentConfigPage() {
     }
   };
 
+  const capabilities = [
+    {
+      icon: WhatsAppIcon,
+      tone: "z-tone-orange",
+      title: lang === "en" ? "Answers for you" : "Responde por ti",
+      text:
+        lang === "en"
+          ? "Questions, services and prices, in your business tone, even when you are busy."
+          : "Dudas, servicios y precios, con el tono de tu negocio, incluso cuando estás ocupado.",
+    },
+    {
+      icon: CalendarCheck2,
+      tone: "z-tone-green",
+      title: lang === "en" ? "Books without clashes" : "Agenda sin choques",
+      text:
+        lang === "en"
+          ? "Checks your calendar first. If it is not on your schedule, the agent does not confirm it."
+          : "Revisa tu calendario primero. Si no quedó en tu agenda, el agente no lo confirma.",
+    },
+    {
+      icon: CalendarSync,
+      tone: "z-tone-purple",
+      title: lang === "en" ? "Moves and cancels" : "Cambia y cancela",
+      text:
+        lang === "en"
+          ? "Customers change their appointment on WhatsApp, without calls or waiting."
+          : "Tus clientes mueven o cancelan su cita por WhatsApp, sin llamadas ni esperas.",
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header with Save actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200/70 dark:border-zinc-800/80 pb-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Bot className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            {lang === "en" ? `My Agent · ${tenant.name}` : `Mi Agente · ${tenant.name}`}
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            {lang === "en"
-              ? `Customize how your virtual assistant greets customers and manages appointments for ${tenant.name}.`
-              : `Personaliza cómo saluda tu asistente, qué información solicita y cómo agenda las citas de ${tenant.name}.`}
-          </p>
-        </div>
+      <PageHeader
+        kicker={lang === "en" ? "My agent" : "Mi agente"}
+        title={
+          <>
+            {lang === "en" ? "Your agent, " : "Tu agente, "}
+            <em>{tenant.name}.</em>
+          </>
+        }
+        description={
+          lang === "en"
+            ? "Tell it how to treat your customers and try it before going live."
+            : "Dile cómo atender a tus clientes y pruébalo antes de que hable con ellos."
+        }
+        actions={
+          <>
+            <label className="flex cursor-pointer items-center gap-2 text-[0.8rem] font-semibold text-on-coffee">
+              {isActive
+                ? lang === "en"
+                  ? "Active"
+                  : "Activo"
+                : lang === "en"
+                  ? "Paused"
+                  : "En pausa"}
+              <Switch checked={isActive} onCheckedChange={setIsActive} />
+            </label>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? (
+                <RefreshCw className="animate-spin" />
+              ) : savedSuccess ? (
+                <CheckCircle2 />
+              ) : (
+                <Save />
+              )}
+              {isSaving
+                ? lang === "en"
+                  ? "Saving..."
+                  : "Guardando..."
+                : savedSuccess
+                  ? lang === "en"
+                    ? "Saved"
+                    : "Guardado"
+                  : lang === "en"
+                    ? "Save changes"
+                    : "Guardar cambios"}
+            </Button>
+          </>
+        }
+      />
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 mr-2">
-            <span className="text-xs font-medium text-zinc-500">
-              {lang === "en" ? "Agent Active:" : "Agente Activo:"}
-            </span>
-            <Switch checked={isActive} onCheckedChange={setIsActive} />
-          </div>
+      {saveFailed && (
+        <Notice tone="danger" onDismiss={() => setSaveFailed(false)}>
+          {lang === "en"
+            ? "Your changes could not be saved. Please try again."
+            : "No se pudieron guardar los cambios. Intenta de nuevo."}
+        </Notice>
+      )}
 
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs cursor-pointer"
-          >
-            {isSaving ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                {lang === "en" ? "Saving..." : "Guardando..."}
-              </>
-            ) : savedSuccess ? (
-              <>
-                <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-300" />
-                {lang === "en" ? "Saved!" : "¡Guardado!"}
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                {lang === "en" ? "Save Changes" : "Guardar Cambios"}
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="space-y-6 lg:col-span-7">
+          <Rise delay={80}>
+            <SectionCard
+              tone="coffee"
+              icon={PenLine}
+              kicker={lang === "en" ? "Instructions" : "Instrucciones"}
+              title={lang === "en" ? "How it should attend" : "Cómo debe atender"}
+            >
+              <p className="text-sm text-muted-foreground">
+                {lang === "en"
+                  ? "Write it in plain language. Include your hours and your tone."
+                  : "Escríbelo en lenguaje sencillo. Incluye tus horarios y tu tono."}
+              </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Instructions & Preferences */}
-        <div className="lg:col-span-7 space-y-6">
-          {/* Prompt Editor */}
-          <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold">
-                    {lang === "en" ? "Assistant Instructions" : "Instrucciones de tu Asistente"}
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {lang === "en"
-                      ? `Write in plain language how the assistant should care for your customers at ${tenant.name}.`
-                      : `Indica en lenguaje sencillo cómo debe atender tu asistente a los clientes de ${tenant.name}.`}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
               <Textarea
-                rows={13}
+                rows={14}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                className="text-xs sm:text-sm leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 resize-y border-zinc-200 dark:border-zinc-800"
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  setTemplateRestored(false);
+                }}
+                aria-label={lang === "en" ? "Agent instructions" : "Instrucciones del agente"}
+                className="mt-4 max-h-[28rem] min-h-72! resize-y leading-relaxed"
                 placeholder={
                   lang === "en"
-                    ? "Write instructions for your assistant..."
-                    : "Escribe las instrucciones para tu asistente..."
+                    ? "Write instructions for your agent..."
+                    : "Escribe las instrucciones para tu agente..."
                 }
               />
-              <div className="flex items-center justify-between text-xs text-zinc-500">
-                <span>
-                  {lang === "en"
-                    ? "Tip: Include your business hours and tone of voice."
-                    : "Consejo: Incluye tus horarios de atención y el tono de trato que prefieras."}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleResetToDefault}
-                    className="text-xs h-7 text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                  >
-                    <RotateCcw className="mr-1 h-3 w-3" />
-                    {lang === "en" ? "Restore suggested template" : "Restaurar plantilla sugerida"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* AI Engine & Capabilities */}
-          <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Sliders className="h-4 w-4 text-indigo-500" />
-                {lang === "en" ? "Intelligence & Capabilities" : "Inteligencia y Capacidades Activas"}
-              </CardTitle>
-              <CardDescription className="text-xs">
-                {lang === "en"
-                  ? "Configured engine and automatic capabilities running for your business."
-                  : "Motor configurado y acciones automáticas habilitadas para tu negocio."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider block">
-                    {lang === "en" ? "AI Core Engine" : "Motor de Inteligencia Activo"}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <Button type="button" variant="ghost" size="xs" onClick={handleResetToDefault}>
+                  <RotateCcw />
+                  {lang === "en" ? "Restore suggested template" : "Restaurar plantilla sugerida"}
+                </Button>
+                {templateRestored && (
+                  <span className="text-xs font-semibold text-brand-text">
+                    {lang === "en" ? "Save to apply it." : "Guarda para aplicarla."}
                   </span>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mt-0.5">
-                    Google Gemini · Gemini 3.8 Flash
-                  </p>
-                </div>
-                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border-0 text-xs">
-                  {lang === "en" ? "High Speed (< 1.5s)" : "Alta Velocidad (< 1.5s)"}
-                </Badge>
+                )}
               </div>
+            </SectionCard>
+          </Rise>
 
-              {/* Natural Language Capabilities */}
-              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-                <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  {lang === "en" ? "Active Capabilities" : "Acciones Automáticas Activas"}
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>
-                      {lang === "en" ? "Availability check" : "Consulta de disponibilidad"}
+          <Rise delay={160}>
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {capabilities.map(({ icon: Icon, tone, title, text }, index) => (
+                <article key={title} className={`z-feature ${tone}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="z-icon-chip h-12! w-12!">
+                      <Icon className="h-6 w-6" />
                     </span>
+                    <span className="font-mono text-xs opacity-80">/ 0{index + 1}</span>
                   </div>
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>{lang === "en" ? "Google Calendar sync" : "Sincronización en Google Calendar"}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <h3 className="z-title mt-8 text-2xl">{title}</h3>
+                  <p className="mt-2 text-[0.8rem] leading-relaxed text-white/85">{text}</p>
+                </article>
+              ))}
+            </section>
+          </Rise>
         </div>
 
-        {/* Right Column: Live Testing Playground */}
-        <div className="lg:col-span-5">
-          <Card className="h-full flex flex-col border-zinc-200/70 dark:border-zinc-800/80 shadow-2xs">
-            <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-indigo-500" />
-                    {lang === "en" ? "Simulate Chat" : "Simular Chat"}
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {lang === "en"
-                      ? `Test how your assistant responds to ${tenant.name} customers.`
-                      : `Prueba cómo responde tu asistente a los clientes de ${tenant.name}.`}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleResetChat}
-                    className="flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
-                    title={lang === "en" ? "Start fresh conversation" : "Iniciar nueva conversación limpia"}
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    {lang === "en" ? "New chat" : "Reiniciar chat"}
-                  </button>
-                  <Badge variant="secondary" className="text-[10px] bg-zinc-100 dark:bg-zinc-800">
-                    WhatsApp
-                  </Badge>
-                </div>
+        {/* Simulador: mismo teléfono de la landing */}
+        <Rise delay={120} className="lg:col-span-5">
+          <section className="z-card flex h-[640px] flex-col overflow-hidden rounded-3xl lg:sticky lg:top-6">
+            <div className="flex items-center gap-3 bg-coffee px-4 py-3 text-on-coffee">
+              <ZabioMark size={28} tone="white" />
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-sm font-bold">{tenant.name}</h2>
+                <p className="font-mono text-[0.65rem] text-on-coffee-soft">
+                  {lang === "en" ? "Test chat" : "Chat de prueba"}
+                </p>
               </div>
-            </CardHeader>
+              <button
+                type="button"
+                onClick={handleResetChat}
+                title={lang === "en" ? "Start a new chat" : "Empezar un chat nuevo"}
+                aria-label={lang === "en" ? "Start a new chat" : "Empezar un chat nuevo"}
+                className="cursor-pointer rounded-lg p-1.5 text-on-coffee-soft transition-colors hover:text-on-coffee"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
 
-            <CardContent className="flex-1 flex flex-col p-4 space-y-4">
-              {/* Message thread */}
-              <div className="flex-1 min-h-[360px] max-h-[500px] overflow-y-auto space-y-3 p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800 flex flex-col">
-                {chatMessages.length === 0 && !isSimulating && (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-zinc-400 space-y-2.5 my-auto">
-                    <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                      <Sparkles className="h-5 w-5" />
-                    </div>
-                    <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                      {lang === "en" ? "Ready to test your agent" : "Listo para probar tu agente"}
-                    </p>
-                    <p className="text-xs max-w-xs text-zinc-400 dark:text-zinc-500">
-                      {lang === "en"
-                        ? "Type a greeting or question in the box below to start the conversation."
-                        : "Escribe un saludo o pregunta en la barra inferior para iniciar la conversación."}
-                    </p>
-                  </div>
-                )}
-                {chatMessages.map((msg, index) => (
-                  <div key={index} className="space-y-1">
-                    {(msg.actionBadge || msg.providerBadge) && (
-                      <div className="ml-9 flex items-center gap-1.5 flex-wrap">
-                        {msg.actionBadge && (
-                          msg.actionType === "warning" ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/50">
-                              <AlertTriangle className="h-2.5 w-2.5" />
-                              {msg.actionBadge}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
-                              <CheckCircle2 className="h-2.5 w-2.5" />
-                              {msg.actionBadge}
-                            </span>
-                          )
-                        )}
-                        {msg.providerBadge && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/50">
-                            <Sparkles className="h-2.5 w-2.5" />
-                            {msg.providerBadge}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div
-                      className={`flex items-start gap-2.5 ${
-                        msg.role === "user" ? "flex-row-reverse" : "flex-row"
-                      }`}
+            <div
+              ref={simScrollRef}
+              className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto bg-muted p-4"
+            >
+              {chatMessages.length === 0 && !isSimulating && (
+                <EmptyState
+                  className="my-auto"
+                  icon={Sparkles}
+                  title={lang === "en" ? "Say hello" : "Salúdalo"}
+                  description={
+                    lang === "en"
+                      ? "Write as if you were a customer. It uses the instructions on this page, even unsaved ones."
+                      : "Escribe como si fueras un cliente. Usa las instrucciones de esta página, aunque no las hayas guardado."
+                  }
+                />
+              )}
+              {chatMessages.map((msg, index) => (
+                <div key={index}>
+                  {msg.actionBadge && (
+                    <StatusPill
+                      tone={msg.actionType === "warning" ? "warning" : "success"}
+                      className="mb-1.5"
                     >
-                      <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 ${
-                          msg.role === "user"
-                            ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900"
-                            : "bg-indigo-600 text-white"
-                        }`}
-                      >
-                        {msg.role === "user" ? (
-                          <User className="h-3.5 w-3.5" />
-                        ) : (
-                          <Bot className="h-3.5 w-3.5" />
-                        )}
-                      </div>
-                      <div
-                        className={`p-3 rounded-2xl text-xs sm:text-sm max-w-[80%] leading-relaxed shadow-2xs ${
-                          msg.role === "user"
-                            ? "bg-indigo-600 text-white rounded-tr-none"
-                            : "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-700/60 rounded-tl-none"
-                        }`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {isSimulating && (
-                  <div className="flex items-center gap-2 text-xs text-zinc-400 p-2 italic">
-                    <Sparkles className="h-3.5 w-3.5 animate-spin text-indigo-500" />
-                    {lang === "en"
-                      ? "Checking calendar and preparing reply..."
-                      : "Revisando tu agenda y preparando respuesta..."}
-                  </div>
-                )}
-              </div>
-
-              {llmNotice && (
-                <div className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
-                  <span>ℹ️ {llmNotice}</span>
-                  <button
-                    type="button"
-                    onClick={() => setLlmNotice(null)}
-                    className="text-amber-500 hover:text-amber-800 ml-2"
+                      {msg.actionType === "warning" ? (
+                        <AlertTriangle className="h-3 w-3" />
+                      ) : (
+                        <CheckCircle2 className="h-3 w-3" />
+                      )}
+                      {msg.actionBadge}
+                    </StatusPill>
+                  )}
+                  <div
+                    className={`z-bubble ${
+                      msg.role === "user" ? "z-bubble-customer" : "z-bubble-agent"
+                    }`}
                   >
-                    ✕
-                  </button>
+                    {msg.content}
+                  </div>
+                  {msg.providerBadge && (
+                    <p className="mt-1 font-mono text-[0.62rem] text-muted-foreground">
+                      {msg.providerBadge}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {isSimulating && (
+                <div className="z-bubble z-bubble-agent">
+                  <TypingDots
+                    label={
+                      lang === "en"
+                        ? "Checking your calendar and preparing a reply"
+                        : "Revisando tu agenda y preparando la respuesta"
+                    }
+                  />
                 </div>
               )}
+            </div>
 
-              {/* Chat Input */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendMessage();
-                }}
-                className="flex items-center gap-2 pt-2"
+            {llmNotice && (
+              <Notice
+                tone="warning"
+                onDismiss={() => setLlmNotice(null)}
+                className="mx-3 mt-3 text-xs"
               >
-                <Input
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder={
-                    lang === "en"
-                      ? "Write as if you were a customer..."
-                      : "Escribe como si fueras un cliente..."
-                  }
-                  className="text-xs sm:text-sm h-10"
-                />
-                <Button
-                  type="submit"
-                  size="icon"
-                  className="h-10 w-10 shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+                {llmNotice}
+              </Notice>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage();
+              }}
+              className="flex items-center gap-2 py-3 pr-20 pl-3"
+            >
+              <Input
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                aria-label={lang === "en" ? "Your message" : "Tu mensaje"}
+                placeholder={lang === "en" ? "Write a message..." : "Escribe un mensaje..."}
+                className="rounded-full"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                disabled={isSimulating || !inputMessage.trim()}
+                aria-label={lang === "en" ? "Send" : "Enviar"}
+              >
+                <Send />
+              </Button>
+            </form>
+          </section>
+        </Rise>
       </div>
     </div>
   );

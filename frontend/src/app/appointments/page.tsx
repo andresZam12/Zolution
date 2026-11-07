@@ -2,23 +2,31 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Calendar,
-  Clock,
-  Phone,
-  CheckCircle2,
-  CalendarCheck,
-  Plus,
-  ExternalLink,
-  Sparkles,
-  RefreshCw,
-  X,
-  Trash2,
   Ban,
+  Calendar,
+  CalendarCheck,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Phone,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  X,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Modal,
+  Notice,
+  PageHeader,
+  Rise,
+  Segmented,
+} from "@/components/zabio-ui";
 import { apiFetch } from "@/lib/api";
 import { fromTime12h, Time12h, toTime12h } from "@/lib/time";
 import {
@@ -32,7 +40,7 @@ import {
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1);
 const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, index) => index * 5);
 const TIME_SELECT_CLASS =
-  "h-9 w-full rounded-md border border-input bg-transparent px-1 text-xs dark:bg-zinc-900";
+  "z-select px-1.5";
 
 interface ExtendedAppointmentItem extends AppointmentItem {
   htmlLink?: string | null;
@@ -54,6 +62,12 @@ export default function AppointmentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [checkDate, setCheckDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [availabilityResult, setAvailabilityResult] = useState<string | null>(null);
+  const [availabilityFailed, setAvailabilityFailed] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    type: "cancel" | "delete";
+    apt: ExtendedAppointmentItem;
+  } | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -108,17 +122,14 @@ export default function AppointmentsPage() {
   const handleCheckAvailability = async () => {
     setIsCheckingAvailability(true);
     setAvailabilityResult(null);
+    setAvailabilityFailed(false);
     try {
       const res = await apiFetch<{ date: string; availability: string }>(
         `/appointments/availability?date=${checkDate}`
       );
       setAvailabilityResult(res.availability);
     } catch {
-      setAvailabilityResult(
-        lang === "en"
-          ? `Schedule available for ${checkDate} at ${tenant.name}.`
-          : `Horarios disponibles para la fecha consultada (${checkDate}) en ${tenant.name}.`
-      );
+      setAvailabilityFailed(true);
     } finally {
       setIsCheckingAvailability(false);
     }
@@ -192,7 +203,7 @@ export default function AppointmentsPage() {
   };
 
   const showActionError = (err: unknown, fallback: { en: string; es: string }) => {
-    window.alert(err instanceof Error ? err.message : lang === "en" ? fallback.en : fallback.es);
+    setActionError(err instanceof Error ? err.message : lang === "en" ? fallback.en : fallback.es);
   };
 
   const updateStatus = async (
@@ -219,12 +230,6 @@ export default function AppointmentsPage() {
     updateStatus(apt, apt.status === "confirmed" ? "completed" : "confirmed");
 
   const handleDeleteAppointment = async (apt: ExtendedAppointmentItem) => {
-    const confirmMsg =
-      lang === "en"
-        ? "Permanently delete this appointment? It will also be removed from Google Calendar."
-        : "¿Eliminar esta cita definitivamente? También se quitará de Google Calendar.";
-    if (!window.confirm(confirmMsg)) return;
-
     try {
       await apiFetch(`/appointments/${apt.id}`, { method: "DELETE" });
       setAppointments((prev) => prev.filter((item) => item.id !== apt.id));
@@ -236,12 +241,13 @@ export default function AppointmentsPage() {
     }
   };
 
-  const handleCancelAppointment = (apt: ExtendedAppointmentItem) => {
-    const confirmMsg =
-      lang === "en"
-        ? "Are you sure you want to cancel this appointment? It will be removed from Google Calendar."
-        : "¿Seguro que deseas cancelar esta cita? Se desocupará y eliminará de Google Calendar.";
-    if (window.confirm(confirmMsg)) updateStatus(apt, "cancelled");
+  const handleConfirmPendingAction = () => {
+    if (!pendingAction) return;
+    const { type, apt } = pendingAction;
+    setPendingAction(null);
+    setActionError(null);
+    if (type === "cancel") updateStatus(apt, "cancelled");
+    else handleDeleteAppointment(apt);
   };
 
   const filteredAppointments = appointments.filter((apt) =>
@@ -250,406 +256,384 @@ export default function AppointmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <CalendarCheck className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            {lang === "en" ? `Appointments · ${tenant.name}` : `Citas · ${tenant.name}`}
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            {lang === "en"
-              ? `Manage appointments scheduled by your assistant and synced with Google Calendar.`
-              : `Gestiona las citas reservadas por tu asistente y sincronizadas con Google Calendar.`}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-xl border border-zinc-200/80 dark:border-zinc-800 p-0.5 bg-zinc-100/80 dark:bg-zinc-900 text-xs">
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                filter === "all"
-                  ? "bg-white dark:bg-zinc-800 font-semibold shadow-2xs"
-                  : "text-zinc-500"
-              }`}
-            >
-              {lang === "en" ? "All" : "Todas"}
-            </button>
-            <button
-              onClick={() => setFilter("confirmed")}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                filter === "confirmed"
-                  ? "bg-white dark:bg-zinc-800 font-semibold shadow-2xs"
-                  : "text-zinc-500"
-              }`}
-            >
-              {lang === "en" ? "Confirmed" : "Confirmadas"}
-            </button>
-            <button
-              onClick={() => setFilter("completed")}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                filter === "completed"
-                  ? "bg-white dark:bg-zinc-800 font-semibold shadow-2xs"
-                  : "text-zinc-500"
-              }`}
-            >
-              {lang === "en" ? "Completed" : "Completadas"}
-            </button>
-          </div>
-
-          <Button
-            onClick={() => setModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs cursor-pointer"
-          >
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            {lang === "en" ? "New Appointment" : "Nueva Cita"}
+      <PageHeader
+        kicker={lang === "en" ? "Appointments" : "Citas"}
+        title={
+          lang === "en" ? (
+            <>
+              Your schedule, <em>in order.</em>
+            </>
+          ) : (
+            <>
+              Tu agenda, <em>en orden.</em>
+            </>
+          )
+        }
+        description={
+          lang === "en"
+            ? "What your agent booked, and what you add yourself."
+            : "Lo que tu agente agendó y lo que agregues tú."
+        }
+        actions={
+          <Button onClick={() => setModalOpen(true)}>
+            <Plus />
+            {lang === "en" ? "New appointment" : "Nueva cita"}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Quick Availability Checker Bar */}
-      <Card className="border-zinc-200/70 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 shadow-2xs">
-        <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                {lang === "en" ? "Quick Schedule Check" : "Consulta Rápida de Disponibilidad"}
-              </p>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                {lang === "en"
-                  ? `Check open time slots in ${tenant.name}'s calendar.`
-                  : `Verifica qué horarios tienes libres en el calendario de ${tenant.name}.`}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Input
-              type="date"
-              value={checkDate}
-              onChange={(e) => setCheckDate(e.target.value)}
-              className="h-8 text-xs w-36"
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCheckAvailability}
-              disabled={isCheckingAvailability}
-              className="text-xs h-8 whitespace-nowrap cursor-pointer"
-            >
-              {isCheckingAvailability ? (
-                <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1" />
-              ) : null}
-              {lang === "en" ? "Check Schedule" : "Ver Horarios"}
-            </Button>
-          </div>
-        </CardContent>
-        {availabilityResult && (
-          <div className="px-4 pb-3 pt-0">
-            <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 text-xs text-zinc-800 dark:text-zinc-200 flex items-center justify-between gap-2">
-              <span>{availabilityResult}</span>
-              <Badge
-                variant="outline"
-                className="text-[10px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 shrink-0"
-              >
-                {lang === "en" ? "Available" : "Disponible"}
-              </Badge>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {filteredAppointments.length === 0 && !isLoading && (
-        <p className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          {loadFailed
-            ? lang === "en"
-              ? "Appointments could not be loaded. Please try again."
-              : "No se pudieron cargar las citas. Intenta de nuevo."
-            : lang === "en"
-              ? "There are no appointments here yet."
-              : "Todavía no hay citas aquí."}
-        </p>
+      {actionError && (
+        <Notice tone="danger" onDismiss={() => setActionError(null)}>
+          {actionError}
+        </Notice>
       )}
 
-      {/* Appointments Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredAppointments.map((apt) => (
-          <Card
-            key={apt.id}
-            className="border-zinc-200/70 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 shadow-2xs"
+      {/* Barra de herramientas */}
+      <Rise delay={80} className="z-card flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <Segmented
+          value={filter}
+          onChange={setFilter}
+          className="sm:w-fit"
+          options={[
+            { value: "all", label: lang === "en" ? "All" : "Todas" },
+            { value: "confirmed", label: lang === "en" ? "Confirmed" : "Confirmadas" },
+            { value: "completed", label: lang === "en" ? "Completed" : "Completadas" },
+          ]}
+        />
+
+        <div className="flex items-center gap-2">
+          <span className="hidden text-xs font-semibold text-muted-foreground sm:inline">
+            {lang === "en" ? "Free slots on" : "Horarios libres el"}
+          </span>
+          <Input
+            type="date"
+            value={checkDate}
+            onChange={(e) => setCheckDate(e.target.value)}
+            aria-label={lang === "en" ? "Date to check" : "Fecha a consultar"}
+            className="h-9 w-auto min-w-0 flex-1 rounded-full sm:flex-none"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCheckAvailability}
+            disabled={isCheckingAvailability}
           >
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-sm font-semibold">{apt.patientName}</CardTitle>
-                  <CardDescription className="text-xs flex items-center gap-1 mt-0.5">
-                    <Phone className="h-3 w-3" />
-                    {apt.phone}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleComplete(apt)}
-                    title={
-                      lang === "en"
-                        ? "Click to toggle status"
-                        : "Clic para cambiar estado (Confirmada / Completada)"
-                    }
-                  >
-                    <Badge
-                      variant={apt.status === "confirmed" ? "default" : "secondary"}
-                      className={`text-[10px] uppercase font-bold tracking-wider cursor-pointer ${
-                        apt.status === "confirmed"
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                          : apt.status === "completed"
-                          ? "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-                          : "bg-rose-50 text-rose-600 dark:bg-rose-950/40 border border-rose-200"
-                      }`}
-                    >
-                      {apt.status === "confirmed"
-                        ? lang === "en"
-                          ? "Confirmed"
-                          : "Confirmada"
-                        : apt.status === "completed"
+            {isCheckingAvailability && <RefreshCw className="animate-spin" />}
+            {lang === "en" ? "Check" : "Consultar"}
+          </Button>
+        </div>
+      </Rise>
+
+      {availabilityResult && (
+        <Notice tone="brand" onDismiss={() => setAvailabilityResult(null)}>
+          {availabilityResult}
+        </Notice>
+      )}
+      {availabilityFailed && (
+        <Notice tone="danger" onDismiss={() => setAvailabilityFailed(false)}>
+          {lang === "en"
+            ? "Availability could not be checked. Please try again."
+            : "No se pudo consultar la disponibilidad. Intenta de nuevo."}
+        </Notice>
+      )}
+
+      {loadFailed && (
+        <Notice tone="danger">
+          {lang === "en"
+            ? "Appointments could not be loaded. Please try again."
+            : "No se pudieron cargar las citas. Intenta de nuevo."}
+        </Notice>
+      )}
+
+      {isLoading && appointments.length === 0 && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+          <div className="z-shimmer h-44 rounded-2xl" />
+          <div className="z-shimmer h-44 rounded-2xl" />
+          <div className="z-shimmer h-44 rounded-2xl" />
+        </div>
+      )}
+
+      {filteredAppointments.length === 0 && !isLoading && !loadFailed && (
+        <EmptyState
+          icon={CalendarCheck}
+          title={lang === "en" ? "Nothing here yet" : "Todavía no hay citas aquí"}
+          description={
+            lang === "en"
+              ? "When your agent books one, you will see it here."
+              : "Cuando tu agente agende una, la verás aquí."
+          }
+        />
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredAppointments.map((apt, index) => {
+          const isCancelled = apt.status === "cancelled";
+          const inCalendar = Boolean(apt.googleEventId);
+          return (
+            <Rise key={apt.id} delay={Math.min(index, 8) * 50}>
+              <article
+                className="z-card z-card-hover flex h-full flex-col overflow-hidden p-5"
+              >
+                <div
+                  className={`-mx-5 -mt-5 flex items-start justify-between gap-3 px-5 py-4 ${
+                    apt.status === "confirmed"
+                      ? "z-tone-green"
+                      : apt.status === "completed"
+                        ? "z-tone-coffee"
+                        : "z-tone-stone"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <h2 className="z-title truncate text-xl">{apt.patientName}</h2>
+                    <p className="mt-1 flex items-center gap-1.5 font-mono text-[0.7rem] opacity-85">
+                      <Phone className="h-3 w-3" />
+                      <span className="truncate">{apt.phone}</span>
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-xs font-bold">
+                    {apt.status === "confirmed"
+                      ? lang === "en"
+                        ? "Confirmed"
+                        : "Confirmada"
+                      : apt.status === "completed"
                         ? lang === "en"
                           ? "Completed"
                           : "Completada"
                         : lang === "en"
                           ? "Cancelled"
                           : "Cancelada"}
-                    </Badge>
-                  </button>
-                  {apt.status !== "cancelled" && (
-                    <button
-                      type="button"
-                      onClick={() => handleCancelAppointment(apt)}
-                      className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                      title={
-                        lang === "en"
-                          ? "Cancel appointment & remove from Google Calendar"
-                          : "Cancelar cita y eliminar de Google Calendar"
-                      }
-                    >
-                      <Ban className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteAppointment(apt)}
-                    className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                    aria-label={lang === "en" ? "Delete appointment" : "Eliminar cita"}
-                    title={lang === "en" ? "Delete appointment" : "Eliminar cita"}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  </span>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 space-y-1.5">
-                <div className="font-medium text-zinc-800 dark:text-zinc-200">{apt.service}</div>
-                <div className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-                  <span>{apt.date}</span>
-                </div>
-                <div className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-indigo-500" />
-                  <span>{apt.time}</span>
-                </div>
-              </div>
 
-              <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
-                {apt.status === "cancelled" ? (
-                  <span className="text-rose-500 font-medium flex items-center gap-1">
-                    <Ban className="h-3 w-3" />
-                    {lang === "en" ? "Cancelled from Calendar" : "Cancelada en Google Calendar"}
-                  </span>
-                ) : (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {lang === "en" ? "Synced with Calendar" : "Sincronizada en Agenda"}
-                  </span>
+                <p className="mt-4 font-bold">{apt.service}</p>
+                <div className="mt-3 grid flex-1 grid-cols-1 content-start gap-2 text-sm">
+                  <p className="flex items-center gap-2.5 rounded-xl bg-muted px-3 py-2 font-semibold">
+                    <Calendar className="h-4 w-4 text-brand" />
+                    {apt.date}
+                  </p>
+                  <p className="flex items-center gap-2.5 rounded-xl bg-muted px-3 py-2 font-semibold">
+                    <Clock className="h-4 w-4 text-brand" />
+                    {apt.time}
+                  </p>
+                </div>
+
+                {!isCancelled && (
+                  <p className="mt-3 text-xs">
+                    {apt.htmlLink ? (
+                      <a
+                        href={apt.htmlLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-bold text-success underline-offset-4 hover:underline"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {lang === "en" ? "In Google Calendar" : "En Google Calendar"}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : inCalendar ? (
+                      <span className="inline-flex items-center gap-1 font-bold text-success">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {lang === "en" ? "In Google Calendar" : "En Google Calendar"}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {lang === "en" ? "Only saved in Zabio" : "Guardada solo en Zabio"}
+                      </span>
+                    )}
+                  </p>
                 )}
-                {apt.htmlLink && apt.status !== "cancelled" && (
-                  <a
-                    href={apt.htmlLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium flex items-center gap-1"
-                  >
-                    <span>{lang === "en" ? "Open in Google" : "Ver en Google"}</span>
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+
+                <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+                  {isCancelled ? (
+                    <span />
+                  ) : (
+                    <Button size="xs" variant="ghost" onClick={() => handleToggleComplete(apt)}>
+                      {apt.status === "confirmed" ? <CheckCircle2 /> : <RotateCcw />}
+                      {apt.status === "confirmed"
+                        ? lang === "en"
+                          ? "Mark completed"
+                          : "Marcar completada"
+                        : lang === "en"
+                          ? "Back to confirmed"
+                          : "Volver a confirmada"}
+                    </Button>
+                  )}
+                  <span className="flex items-center gap-0.5">
+                    {!isCancelled && (
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        onClick={() => setPendingAction({ type: "cancel", apt })}
+                        title={lang === "en" ? "Cancel appointment" : "Cancelar cita"}
+                        aria-label={lang === "en" ? "Cancel appointment" : "Cancelar cita"}
+                        className="hover:bg-danger-soft hover:text-danger"
+                      >
+                        <Ban className="size-5" />
+                      </Button>
+                    )}
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={() => setPendingAction({ type: "delete", apt })}
+                      title={lang === "en" ? "Delete appointment" : "Eliminar cita"}
+                      aria-label={lang === "en" ? "Delete appointment" : "Eliminar cita"}
+                      className="hover:bg-danger-soft hover:text-danger"
+                    >
+                      <Trash2 className="size-5" />
+                    </Button>
+                  </span>
+                </div>
+              </article>
+            </Rise>
+          );
+        })}
       </div>
 
-      {/* Manual Booking Modal */}
+      {pendingAction && (
+        <ConfirmDialog
+          title={
+            pendingAction.type === "cancel"
+              ? lang === "en"
+                ? "Cancel this appointment?"
+                : "¿Cancelar esta cita?"
+              : lang === "en"
+                ? "Delete this appointment?"
+                : "¿Eliminar esta cita?"
+          }
+          description={
+            pendingAction.type === "cancel"
+              ? lang === "en"
+                ? `The time of ${pendingAction.apt.patientName} will be freed and removed from Google Calendar.`
+                : `El horario de ${pendingAction.apt.patientName} quedará libre y se quitará de Google Calendar.`
+              : lang === "en"
+                ? "It will be removed permanently, also from Google Calendar."
+                : "Se borrará definitivamente, también de Google Calendar."
+          }
+          confirmLabel={
+            pendingAction.type === "cancel"
+              ? lang === "en"
+                ? "Yes, cancel"
+                : "Sí, cancelar"
+              : lang === "en"
+                ? "Yes, delete"
+                : "Sí, eliminar"
+          }
+          cancelLabel={lang === "en" ? "Keep it" : "Mantener"}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={handleConfirmPendingAction}
+        />
+      )}
+
+      {/* Nueva cita */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <Card className="w-full max-w-md border-zinc-200 dark:border-zinc-800 shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-base font-semibold">
-                  {lang === "en" ? "New Appointment" : "Nueva Cita"}
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  {lang === "en"
-                    ? `Schedule a new appointment in ${tenant.name}'s calendar.`
-                    : `Agenda una nueva cita directamente en el calendario de ${tenant.name}.`}
-                </CardDescription>
+        <Modal onClose={() => setModalOpen(false)} labelledBy="new-appointment-title" className="p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="z-kicker">/ {lang === "en" ? "Schedule" : "Agenda"}</p>
+              <h2 id="new-appointment-title" className="z-title mt-1.5 text-3xl">
+                {lang === "en" ? "New appointment" : "Nueva cita"}
+              </h2>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setModalOpen(false)}
+              aria-label={lang === "en" ? "Close" : "Cerrar"}
+            >
+              <X />
+            </Button>
+          </div>
+
+          <form onSubmit={handleCreateAppointment} className="mt-5 space-y-4">
+            {feedbackMsg && <Notice tone={feedbackMsg.type === "success" ? "success" : "danger"}>{feedbackMsg.text}</Notice>}
+
+            <Field label={lang === "en" ? "Customer" : "Cliente"}>
+              <Input
+                required
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                placeholder="Juan Pérez"
+              />
+            </Field>
+
+            <Field label="WhatsApp">
+              <Input
+                required
+                value={patientPhone}
+                onChange={(e) => setPatientPhone(e.target.value)}
+                placeholder="+57 311 000 0000"
+              />
+            </Field>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label={lang === "en" ? "Date" : "Fecha"}>
+                <Input
+                  type="date"
+                  required
+                  value={appointmentDate}
+                  onChange={(e) => setAppointmentDate(e.target.value)}
+                />
+              </Field>
+              <div className="space-y-1.5">
+                <span className="text-[0.8rem] font-semibold">{lang === "en" ? "Time" : "Hora"}</span>
+                <div className="flex items-center gap-1">
+                  <select
+                    aria-label={lang === "en" ? "Hour" : "Hora"}
+                    value={selectedTime.hour}
+                    onChange={(e) => updateTime({ hour: Number(e.target.value) })}
+                    className={TIME_SELECT_CLASS}
+                  >
+                    {HOUR_OPTIONS.map((hour) => (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={lang === "en" ? "Minutes" : "Minutos"}
+                    value={selectedTime.minute}
+                    onChange={(e) => updateTime({ minute: Number(e.target.value) })}
+                    className={TIME_SELECT_CLASS}
+                  >
+                    {MINUTE_OPTIONS.map((minute) => (
+                      <option key={minute} value={minute}>
+                        {String(minute).padStart(2, "0")}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="AM / PM"
+                    value={selectedTime.period}
+                    onChange={(e) => updateTime({ period: e.target.value as Time12h["period"] })}
+                    className={TIME_SELECT_CLASS}
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setModalOpen(false)}
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4" />
+            </div>
+
+            <Field label={lang === "en" ? "Service" : "Servicio"}>
+              <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} />
+            </Field>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>
+                {lang === "en" ? "Cancel" : "Cancelar"}
               </Button>
-            </CardHeader>
-
-            <form onSubmit={handleCreateAppointment}>
-              <CardContent className="space-y-3.5 text-xs">
-                {feedbackMsg && (
-                  <div
-                    className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
-                      feedbackMsg.type === "success"
-                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                        : "bg-rose-50 text-rose-800 border border-rose-200"
-                    }`}
-                  >
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>{feedbackMsg.text}</span>
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    {lang === "en" ? "Customer Name" : "Nombre del Cliente"}
-                  </label>
-                  <Input
-                    required
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    placeholder="Ej. Juan Pérez"
-                    className="h-9 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    {lang === "en" ? "Phone (WhatsApp)" : "Teléfono (WhatsApp)"}
-                  </label>
-                  <Input
-                    required
-                    value={patientPhone}
-                    onChange={(e) => setPatientPhone(e.target.value)}
-                    placeholder="Ej. +57 311 000 0000"
-                    className="h-9 text-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      {lang === "en" ? "Date" : "Fecha"}
-                    </label>
-                    <Input
-                      type="date"
-                      required
-                      value={appointmentDate}
-                      onChange={(e) => setAppointmentDate(e.target.value)}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      {lang === "en" ? "Time" : "Hora"}
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <select
-                        aria-label={lang === "en" ? "Hour" : "Hora"}
-                        value={selectedTime.hour}
-                        onChange={(e) => updateTime({ hour: Number(e.target.value) })}
-                        className={TIME_SELECT_CLASS}
-                      >
-                        {HOUR_OPTIONS.map((hour) => (
-                          <option key={hour} value={hour}>
-                            {hour}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label={lang === "en" ? "Minutes" : "Minutos"}
-                        value={selectedTime.minute}
-                        onChange={(e) => updateTime({ minute: Number(e.target.value) })}
-                        className={TIME_SELECT_CLASS}
-                      >
-                        {MINUTE_OPTIONS.map((minute) => (
-                          <option key={minute} value={minute}>
-                            {String(minute).padStart(2, "0")}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="AM / PM"
-                        value={selectedTime.period}
-                        onChange={(e) => updateTime({ period: e.target.value as Time12h["period"] })}
-                        className={TIME_SELECT_CLASS}
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    {lang === "en" ? "Service or Reason" : "Servicio o Motivo"}
-                  </label>
-                  <Input
-                    value={serviceName}
-                    onChange={(e) => setServiceName(e.target.value)}
-                    className="h-9 text-xs"
-                  />
-                </div>
-
-                <div className="pt-2 flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setModalOpen(false)}
-                    className="text-xs cursor-pointer"
-                  >
-                    {lang === "en" ? "Cancel" : "Cancelar"}
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || isLoading}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs cursor-pointer"
-                  >
-                    {isSubmitting
-                      ? lang === "en"
-                        ? "Scheduling..."
-                        : "Agendando..."
-                      : lang === "en"
-                        ? "Schedule Appointment"
-                        : "Agendar Cita"}
-                  </Button>
-                </div>
-              </CardContent>
-            </form>
-          </Card>
-        </div>
+              <Button type="submit" disabled={isSubmitting || isLoading}>
+                {isSubmitting
+                  ? lang === "en"
+                    ? "Scheduling..."
+                    : "Agendando..."
+                  : lang === "en"
+                    ? "Schedule"
+                    : "Agendar cita"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

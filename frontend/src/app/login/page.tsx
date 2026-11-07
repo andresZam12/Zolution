@@ -2,22 +2,12 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Building2,
-  Lock,
-  Mail,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  KeyRound,
-  RotateCcw,
-  AlertCircle,
-  RefreshCw,
-} from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight, CheckCircle2, RefreshCw, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { GoogleIcon } from "@/components/brand-icons";
+import { ZabioLogo, ZabioMark, ZabioWatermark } from "@/components/zabio-logo";
+import { Field, Notice, Rise, Segmented } from "@/components/zabio-ui";
 import { apiFetch } from "@/lib/api";
 
 function LoginContent() {
@@ -298,168 +288,132 @@ function LoginContent() {
     }
   };
 
+  const showGoogle = !isRegister || regStep === 1;
+
+  const title = isRegister
+    ? regStep === 1
+      ? "Crea tu agente"
+      : "Revisa tu correo"
+    : "Qué bueno verte";
+
+  const subtitle = isRegister
+    ? regStep === 1
+      ? "Cuéntanos lo esencial de tu negocio."
+      : `Escribe el código de 6 dígitos que enviamos a ${email}.`
+    : "Entra para ver tus conversaciones y tus citas.";
+
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white font-black text-2xl shadow-xs">
-          Z
+    <div className="grid min-h-screen lg:grid-cols-2">
+      {/* Banda café: el mensaje principal de la landing */}
+      <aside className="relative hidden overflow-hidden bg-coffee p-12 text-on-coffee lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute inset-0 bg-[radial-gradient(700px_420px_at_85%_-5%,rgb(232_117_60/32%),transparent_62%),radial-gradient(520px_360px_at_0%_105%,rgb(37_211_102/10%),transparent_60%)]" />
+        <ZabioWatermark className="-right-16 -bottom-20 h-[34rem] w-[34rem]" />
+
+        <div className="relative">
+          <ZabioLogo tone="white" size={34} />
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-          Zolution
-        </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
-          Asistente virtual inteligente para WhatsApp y Google Calendar
+
+        <div className="relative max-w-lg">
+          <p className="z-kicker flex items-center gap-2 text-[#f29a6a]!">
+            <span className="z-live-dot" />
+            El agente que trabaja contigo
+          </p>
+          <h1 className="z-title mt-5 text-6xl xl:text-7xl">
+            <span className="z-rise block">Convierte cada</span>
+            <span className="z-rise block [--d:120ms]">mensaje en</span>
+            <span className="z-rise block [--d:240ms]">
+              una{" "}
+              <em className="bg-linear-to-r from-brand to-[#ffc98a] bg-clip-text pr-1 text-transparent">
+                oportunidad.
+              </em>
+            </span>
+          </h1>
+          <p className="z-rise mt-6 max-w-sm leading-relaxed text-on-coffee-soft [--d:360ms]">
+            Si no quedó en tu agenda, el agente no lo confirma.
+          </p>
+        </div>
+
+        <p className="relative font-mono text-[0.68rem] text-on-coffee-soft">
+          Atención inteligente. Agenda en orden.
         </p>
-      </div>
+      </aside>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg space-y-6">
-        <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-lg overflow-hidden">
-          {/* Top Google Loading Banner */}
-          {isGoogleLoading && (
-            <div className="bg-indigo-600 text-white text-xs py-2 px-4 text-center flex items-center justify-center gap-2">
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              <span>Conectando con Google...</span>
-            </div>
-          )}
+      {/* Formulario */}
+      <div className="flex items-center justify-center px-5 py-10 sm:px-8">
+        <Rise className="z-card w-full max-w-md p-6 sm:p-8">
+          <div className="mb-8 lg:hidden">
+            <ZabioLogo size={32} />
+          </div>
 
-          <CardHeader className="pb-3">
-            <div className="flex rounded-xl border border-zinc-200/80 dark:border-zinc-800 p-0.5 bg-zinc-100/80 dark:bg-zinc-900 text-xs mb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegister(false);
-                  setRegStep(1);
-                  setErrorMessage(null);
-                }}
-                className={`w-1/2 py-1.5 rounded-lg transition-all font-medium cursor-pointer ${
-                  !isRegister
-                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs"
-                    : "text-zinc-500"
-                }`}
-              >
-                Iniciar Sesión
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegister(true);
-                  setErrorMessage(null);
-                }}
-                className={`w-1/2 py-1.5 rounded-lg transition-all font-medium cursor-pointer ${
-                  isRegister
-                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs"
-                    : "text-zinc-500"
-                }`}
-              >
-                Registrar Negocio
-              </button>
-            </div>
+          <Segmented
+            value={isRegister ? "register" : "login"}
+            onChange={(next) => {
+              setIsRegister(next === "register");
+              setRegStep(1);
+              setErrorMessage(null);
+              setSuccessMessage(null);
+            }}
+            options={[
+              { value: "login", label: "Entrar" },
+              { value: "register", label: "Crear cuenta" },
+            ]}
+          />
 
-            <CardTitle className="text-lg font-bold">
-              {isRegister
-                ? regStep === 1
-                  ? "Crea la cuenta de tu negocio"
-                  : "Verifica tu correo electrónico"
-                : "Iniciar Sesión"}
-            </CardTitle>
-            <CardDescription className="text-xs">
-              {isRegister
-                ? regStep === 1
-                  ? "Atiende a tus clientes y agenda citas de forma automática."
-                  : `Ingresa el código de 6 dígitos enviado a ${email}.`
-                : "Ingresa con tu correo y contraseña."}
-            </CardDescription>
-          </CardHeader>
+          <h2 className="z-title mt-8 text-4xl">{title}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
 
-          <CardContent className="space-y-4">
-            {/* Feedback Alerts */}
-            {errorMessage && (
-              <div className="p-3 rounded-xl text-xs bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
-                <span>{errorMessage}</span>
-              </div>
+          <div className="mt-6 space-y-4">
+            {isGoogleLoading && (
+              <Notice tone="brand">
+                <span className="flex items-center gap-2">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  Conectando con Google...
+                </span>
+              </Notice>
             )}
+            {errorMessage && <Notice tone="danger">{errorMessage}</Notice>}
+            {successMessage && <Notice tone="success">{successMessage}</Notice>}
 
-            {successMessage && (
-              <div className="p-3 rounded-xl text-xs bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span>{successMessage}</span>
-              </div>
-            )}
-
-            {/* Google Authentication Button */}
-            {isRegister && regStep === 1 && (
+            {showGoogle && (
               <>
                 <Button
                   type="button"
                   variant="outline"
+                  size="lg"
                   onClick={handleGoogleSignIn}
                   disabled={isGoogleLoading}
-                  className="w-full h-10 text-xs border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-2.5 font-medium shadow-2xs cursor-pointer"
+                  className="w-full"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.41 7.34 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.59 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                  <span>Registrarse con Google</span>
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] py-0 px-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                  >
-                    Rápido
-                  </Badge>
+                  <GoogleIcon />
+                  {isRegister ? "Registrarme con Google" : "Continuar con Google"}
                 </Button>
 
-                <div className="relative flex items-center justify-center">
-                  <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-                  <span className="bg-white dark:bg-zinc-900 px-2 text-[11px] text-zinc-400 uppercase tracking-wider shrink-0">
-                    o con tu correo
-                  </span>
+                <div className="flex items-center gap-3 font-mono text-[0.65rem] tracking-wider text-muted-foreground uppercase">
+                  <span className="h-px flex-1 bg-border" />
+                  {isRegister ? "o con tu correo" : "o con tu contraseña"}
+                  <span className="h-px flex-1 bg-border" />
                 </div>
               </>
             )}
 
-            {/* FLOW A: Registration Step 1 */}
+            {/* Registro, paso 1 */}
             {isRegister && regStep === 1 && (
-              <form onSubmit={handleRequestOtp} className="space-y-3.5 text-xs">
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Nombre de tu Negocio o Empresa
-                  </label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                    <Input
-                      required
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder="Ej. Clínica Dental, Despacho Jurídico..."
-                      className="pl-9 h-9 text-xs"
-                    />
-                  </div>
-                </div>
+              <form onSubmit={handleRequestOtp} className="space-y-4">
+                <Field label="Nombre de tu negocio">
+                  <Input
+                    required
+                    autoComplete="organization"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="Clínica Dental, Café La Terraza..."
+                  />
+                </Field>
 
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Sector o Especialidad
-                  </label>
+                <Field label="Sector">
                   <select
                     value={industry}
                     onChange={(e) => setIndustry(e.target.value)}
-                    className="w-full h-9 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs"
+                    className="z-select"
                   >
                     <option value="Salud y Consultorios Médicos">Salud y Consultorios Médicos</option>
                     <option value="Servicios Legales y Jurídicos">Servicios Legales y Jurídicos</option>
@@ -469,103 +423,77 @@ function LoginContent() {
                       Servicios Profesionales y Consultoría
                     </option>
                     <option value="Comercio y Retail">Comercio y Retail</option>
-                    <option value="Otro">Otro (Especificar sector)</option>
+                    <option value="Otro">Otro</option>
                   </select>
-                  {industry === "Otro" && (
+                </Field>
+                {industry === "Otro" && (
+                  <Field label="¿Cuál?">
                     <Input
                       required
                       value={customIndustry}
                       onChange={(e) => setCustomIndustry(e.target.value)}
-                      placeholder="Escribe tu sector (ej. Restaurantes, Construcción...)"
-                      className="h-9 text-xs mt-1.5"
+                      placeholder="Restaurantes, Construcción..."
                     />
-                  )}
-                </div>
+                  </Field>
+                )}
 
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Correo Electrónico (Recibirás tu código de acceso)
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                    <Input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="contacto@tuempresa.com"
-                      className="pl-9 h-9 text-xs"
-                    />
-                  </div>
-                </div>
+                <Field label="Correo" hint="Te enviaremos un código para verificarlo.">
+                  <Input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="contacto@tunegocio.com"
+                  />
+                </Field>
 
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Contraseña
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                    <Input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Mínimo 6 caracteres"
-                      className="pl-9 h-9 text-xs"
-                    />
-                  </div>
-                </div>
+                <Field label="Contraseña">
+                  <Input
+                    type="password"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </Field>
 
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-9 text-xs shadow-xs mt-2 cursor-pointer"
-                >
-                  {isLoading ? "Enviando código..." : "Enviar Código de Verificación"}
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                <Button type="submit" size="lg" disabled={isLoading} className="w-full">
+                  {isLoading ? "Enviando código..." : "Enviar código"}
+                  <ArrowRight />
                 </Button>
               </form>
             )}
 
-            {/* FLOW B: Registration Step 2 (OTP Verification) */}
+            {/* Registro, paso 2 */}
             {isRegister && regStep === 2 && (
-              <form onSubmit={handleVerifyOtp} className="space-y-4 text-xs">
-                <div className="space-y-1.5 text-center">
-                  <label className="font-semibold text-zinc-800 dark:text-zinc-200 block text-xs">
-                    Código de Seguridad (6 dígitos)
-                  </label>
-                  <div className="relative max-w-[220px] mx-auto">
-                    <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-indigo-500" />
-                    <Input
-                      type="text"
-                      maxLength={6}
-                      required
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      placeholder="123456"
-                      className="pl-9 h-11 text-center font-mono text-xl tracking-[0.3em] font-bold border-indigo-300 dark:border-indigo-700 focus:border-indigo-600"
-                    />
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1">
-                    Enviado a <strong>{email}</strong>
-                  </p>
-                </div>
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  aria-label="Código de 6 dígitos"
+                  placeholder="000000"
+                  className="h-16 text-center font-mono text-2xl! tracking-[0.4em]"
+                />
 
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-10 text-xs shadow-xs font-semibold cursor-pointer"
-                >
-                  {isLoading ? "Verificando código..." : "Verificar y Crear Cuenta"}
-                  <CheckCircle2 className="ml-1.5 h-4 w-4" />
+                <Button type="submit" size="lg" disabled={isLoading} className="w-full">
+                  {isLoading ? "Verificando..." : "Verificar y crear cuenta"}
+                  <CheckCircle2 />
                 </Button>
 
-                <div className="flex items-center justify-between pt-1 text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <button
                     type="button"
                     onClick={() => setRegStep(1)}
-                    className="text-zinc-500 hover:underline flex items-center gap-1 cursor-pointer"
+                    className="flex cursor-pointer items-center gap-1 font-semibold text-muted-foreground hover:text-foreground"
                   >
                     <RotateCcw className="h-3 w-3" />
                     Corregir datos
@@ -573,7 +501,7 @@ function LoginContent() {
                   <button
                     type="button"
                     onClick={handleRequestOtp}
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium cursor-pointer"
+                    className="cursor-pointer font-bold text-brand-text underline-offset-4 hover:underline"
                   >
                     Reenviar código
                   </button>
@@ -581,100 +509,38 @@ function LoginContent() {
               </form>
             )}
 
-            {/* Google Authentication Button for Login */}
+            {/* Inicio de sesión */}
             {!isRegister && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleGoogleSignIn}
-                  disabled={isGoogleLoading}
-                  className="w-full h-10 text-xs border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-2.5 font-medium shadow-2xs cursor-pointer"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.41 7.34 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.59 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                  <span>Continuar con Google</span>
-                </Button>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <Field label="Correo">
+                  <Input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="contacto@tunegocio.com"
+                  />
+                </Field>
 
-                <div className="relative flex items-center justify-center">
-                  <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-                  <span className="bg-white dark:bg-zinc-900 px-2 text-[11px] text-zinc-400 uppercase tracking-wider shrink-0">
-                    o con tu contraseña
-                  </span>
-                </div>
-              </>
-            )}
+                <Field label="Contraseña">
+                  <Input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </Field>
 
-            {/* FLOW C: Standard Login */}
-            {!isRegister && (
-              <form onSubmit={handleLogin} className="space-y-3.5 text-xs">
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Correo Electrónico
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                    <Input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="contacto@tuempresa.com"
-                      className="pl-9 h-9 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Contraseña
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                    <Input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="pl-9 h-9 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-9 text-xs shadow-xs mt-2 cursor-pointer"
-                >
-                  {isLoading ? "Validando credenciales..." : "Ingresar al Panel"}
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                <Button type="submit" size="lg" disabled={isLoading} className="w-full">
+                  {isLoading ? "Entrando..." : "Entrar"}
+                  <ArrowRight />
                 </Button>
               </form>
             )}
-          </CardContent>
-        </Card>
-
-        <div className="text-center text-xs text-zinc-400 flex items-center justify-center gap-1.5 pt-2">
-          <ShieldCheck className="h-4 w-4 text-emerald-500" />
-          <span>Acceso protegido y confidencialidad para tu negocio</span>
-        </div>
+          </div>
+        </Rise>
       </div>
     </div>
   );
@@ -684,10 +550,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
-            <RefreshCw className="h-4 w-4 animate-spin text-indigo-600" />
-            <span>Cargando Zolution...</span>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="z-pulse-logo">
+            <ZabioMark size={44} />
           </div>
         </div>
       }

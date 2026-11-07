@@ -3,22 +3,32 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Bot,
-  Calendar,
-  MessageSquare,
-  TrendingUp,
-  CheckCircle2,
-  Clock,
-  Sparkles,
   ArrowUpRight,
+  Cable,
+  Calendar,
+  Clock,
+  MessagesSquare,
+  MessageSquare,
   Send,
+  Sparkles,
   X,
-  MessageCircle,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { WhatsAppIcon } from "@/components/brand-icons";
+import { ZabioMark, ZabioPageWatermark } from "@/components/zabio-logo";
+import {
+  AnimatedValue,
+  EmptyState,
+  Modal,
+  PageHeader,
+  PersonAvatar,
+  Rise,
+  SectionCard,
+  StatusPill,
+  TypingDots,
+  useAutoScroll,
+} from "@/components/zabio-ui";
 import { apiFetch } from "@/lib/api";
 import { formatTime12h } from "@/lib/time";
 import {
@@ -63,13 +73,15 @@ export default function OverviewPage() {
   const [convCount, setConvCount] = useState<number | null>(null);
   const [aptCount, setAptCount] = useState<number | null>(null);
   const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
-  const [googleConnected, setGoogleConnected] = useState<boolean>(false);
+  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [overviewLoaded, setOverviewLoaded] = useState(false);
 
   // Quick Agent Simulator Modal state
   const [simOpen, setSimOpen] = useState(false);
   const [simInput, setSimInput] = useState("");
   const [simLoading, setSimLoading] = useState(false);
   const [simMessages, setSimMessages] = useState<QuickSimMessage[]>([]);
+  const simScrollRef = useAutoScroll(simMessages.length + (simLoading ? 1 : 0));
 
   useEffect(() => {
     const refreshTenant = () => {
@@ -100,6 +112,7 @@ export default function OverviewPage() {
       apiFetch<OverviewMetrics>("/analytics/overview").catch(() => null),
     ]).then(([convRes, aptRes, intRes, metricsRes]) => {
       setMetrics(metricsRes);
+      setOverviewLoaded(true);
       if (convRes && typeof convRes.total === "number") {
         setConvCount(convRes.total);
         setRecentConversations(
@@ -116,7 +129,7 @@ export default function OverviewPage() {
       }
       if (Array.isArray(intRes)) {
         const g = intRes.find((i) => i.provider === "google");
-        if (g) setGoogleConnected(g.is_connected);
+        setGoogleConnected(g ? g.is_connected : false);
       }
     });
 
@@ -168,8 +181,8 @@ export default function OverviewPage() {
           role: "assistant",
           text:
             lang === "en"
-              ? "⚠️ I couldn't reach the assistant right now. Please try again."
-              : "⚠️ No pude conectar con el asistente en este momento. Intenta de nuevo.",
+              ? "I couldn't reach your agent right now. Please try again."
+              : "No pude conectar con tu agente en este momento. Intenta de nuevo.",
         },
       ]);
     } finally {
@@ -197,350 +210,287 @@ export default function OverviewPage() {
           ? "Customers who wrote to you"
           : "Clientes que te han escrito",
       icon: MessageSquare,
-      color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40",
+      tone: "z-tone-orange",
     },
     {
       title: lang === "en" ? "Appointments" : "Citas",
       value: aptCount !== null ? String(aptCount) : "—",
       change: lang === "en" ? "Registered in your agenda" : "Registradas en tu agenda",
       icon: Calendar,
-      color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40",
+      tone: "z-tone-green",
     },
     {
-      title: lang === "en" ? "Resolution Rate" : "Tasa de Resolución",
+      title: lang === "en" ? "Resolution rate" : "Tasa de resolución",
       value: metrics?.resolution_rate != null ? `${metrics.resolution_rate}%` : "—",
       change: measuredLabel,
       icon: Sparkles,
-      color: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40",
+      tone: "z-tone-purple",
     },
     {
-      title: lang === "en" ? "Response Time" : "Tiempo de Respuesta",
+      title: lang === "en" ? "Response time" : "Tiempo de respuesta",
       value: metrics?.avg_response_seconds != null ? `${metrics.avg_response_seconds} s` : "—",
       change: lang === "en" ? "Average, last 30 days" : "Promedio, últimos 30 días",
       icon: Clock,
-      color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40",
+      tone: "z-tone-coffee",
     },
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Clean Minimalist Welcome Header */}
-      <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/80 p-6 sm:p-8 shadow-2xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-        <div className="max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>{tenant.industry}</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-            {lang === "en" ? `Welcome back, ${tenant.name}` : `Hola, ${tenant.name}`}
-          </h2>
-          <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-            {lang === "en"
-              ? "Your virtual assistant is active answering customers on WhatsApp and organizing your appointments in Google Calendar."
-              : "Tu asistente virtual está activo atendiendo clientes por WhatsApp y organizando tus citas en Google Calendar."}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <ZabioPageWatermark />
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <Button
-            onClick={() => setSimOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs cursor-pointer px-5"
-          >
-            <MessageCircle className="mr-2 h-4 w-4" />
-            {lang === "en" ? "Test my Agent" : "Probar mi Agente"}
-          </Button>
-          <Link
-            href="/agent"
-            className={cn(
-              buttonVariants({ variant: "outline" }),
-              "border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
-            )}
-          >
-            <Bot className="mr-2 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-            {lang === "en" ? "Customize Agent" : "Personalizar Agente"}
-          </Link>
-        </div>
-      </div>
+      {/* Bienvenida: la banda café de la landing */}
+      <PageHeader
+        kicker={tenant.industry}
+        title={
+          <>
+            {lang === "en" ? "Hello, " : "Hola, "}
+            <em>{tenant.name}.</em>
+          </>
+        }
+        description={
+          lang === "en"
+            ? "Your agent answers on WhatsApp and organizes your appointments in Google Calendar."
+            : "Tu agente atiende por WhatsApp y organiza tus citas en Google Calendar."
+        }
+        actions={
+          <>
+            <Button size="lg" onClick={() => setSimOpen(true)}>
+              {lang === "en" ? "Test my agent" : "Probar mi agente"}
+              <ArrowUpRight />
+            </Button>
+            <Link
+              href="/agent"
+              className="text-sm font-bold text-on-coffee underline-offset-4 hover:underline"
+            >
+              {lang === "en" ? "Customize" : "Personalizar"}
+            </Link>
+          </>
+        }
+      />
 
-      {/* 4 Focal Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {stats.map((stat) => {
+      {/* Métricas medidas */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card
-              key={stat.title}
-              className="border-zinc-200/70 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 shadow-2xs"
-            >
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {stat.title}
-                </CardTitle>
-                <div className={`p-2 rounded-xl ${stat.color}`}>
-                  <Icon className="h-4 w-4" />
+            <Rise key={stat.title} delay={80 + index * 70}>
+              <article className="z-card z-card-hover h-full p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                  <span className="text-xs font-semibold">{stat.title}</span>
+                  <span className={`z-icon-solid ${stat.tone}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                  {stat.value}
-                </div>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-emerald-500" />
-                  {stat.change}
+                <p className="z-title mt-4 text-4xl sm:text-5xl">
+                  <AnimatedValue value={stat.value} />
                 </p>
-              </CardContent>
-            </Card>
+                <p className="mt-2 text-xs leading-snug text-muted-foreground">{stat.change}</p>
+              </article>
+            </Rise>
           );
         })}
       </div>
 
-      {/* Main Grid: Recent Activity & Clean Connections Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity (Natural Language Actions) */}
-        <Card className="lg:col-span-2 border-zinc-200/70 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 shadow-2xs">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-semibold">
-                {lang === "en" ? "Recent Activity" : "Actividad Reciente"}
-              </CardTitle>
-              <CardDescription>
-                {lang === "en"
-                  ? `Latest customer interactions handled for ${tenant.name}`
-                  : `Últimas atenciones realizadas por tu asistente en ${tenant.name}`}
-              </CardDescription>
-            </div>
-            <Link
-              href="/conversations"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-xs")}
-            >
-              {lang === "en" ? "View all" : "Ver todas"}
-              <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {recentConversations.length === 0 ? (
-              <p className="p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                {lang === "en"
-                  ? "Your customers' conversations will appear here."
-                  : "Aquí aparecerán las conversaciones de tus clientes."}
-              </p>
-            ) : (
-              recentConversations.map((conversation) => (
-                <div
-                  key={conversation.id}
-                  className="flex items-start justify-between gap-3 p-3.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-800/40"
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="mt-0.5 w-8 h-8 shrink-0 rounded-full bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-xs font-semibold text-indigo-600 dark:text-indigo-400">
-                      {conversation.customer.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {conversation.customer}
-                      </p>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 truncate">
-                        {conversation.lastMessage}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">
-                    {conversation.time}
-                  </span>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Clean Connections Panel */}
-        <Card className="border-zinc-200/70 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 shadow-2xs flex flex-col justify-between">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">
-              {lang === "en" ? "Connections" : "Conexiones"}
-            </CardTitle>
-            <CardDescription>
-              {lang === "en"
-                ? "Active channels synced with your business"
-                : "Canales activos conectados con tu negocio"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              {/* WhatsApp Card */}
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                    <MessageCircle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      WhatsApp
-                    </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {lang === "en" ? "Customer chat" : "Atención al cliente"}
-                    </p>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {lang === "en" ? "Synced" : "Sincronizado"}
-                </span>
-              </div>
-
-              {/* Google Calendar Card */}
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      Google Calendar
-                    </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {lang === "en" ? "Business schedule" : "Agenda de citas"}
-                    </p>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {googleConnected
-                    ? lang === "en"
-                      ? "Synced"
-                      : "Sincronizado"
-                    : lang === "en"
-                      ? "Synced"
-                      : "Sincronizado"}
-                </span>
-              </div>
-            </div>
-
-            {/* Simplified Autonomous Agent Box */}
-            <div className="p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/25 border border-indigo-100/80 dark:border-indigo-900/40 text-xs space-y-1.5">
-              <p className="font-semibold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                {lang === "en" ? "Autonomous Agent" : "Agente Autónomo"}
-              </p>
-              <p className="text-indigo-900/80 dark:text-indigo-300/80 leading-relaxed">
-                {lang === "en"
-                  ? "Your agent manages appointments and answers questions directly from your business calendar."
-                  : "Tu agente gestiona citas y responde dudas directamente desde el calendario de tu negocio."}
-              </p>
-            </div>
-
-            <div className="pt-1">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Actividad reciente */}
+        <Rise delay={320} className="lg:col-span-2">
+          <SectionCard
+            tone="orange"
+            icon={MessagesSquare}
+            kicker={lang === "en" ? "Recent" : "Reciente"}
+            title={lang === "en" ? "Latest conversations" : "Últimas conversaciones"}
+            bodyClassName="py-3 sm:py-3"
+            action={
               <Link
-                href="/integrations"
-                className={cn(
-                  buttonVariants({ variant: "outline" }),
-                  "w-full text-xs text-center justify-center border-zinc-200 dark:border-zinc-800"
-                )}
+                href="/conversations"
+                className="inline-flex shrink-0 items-center gap-1 text-[0.8rem] font-bold text-white underline-offset-4 hover:underline"
               >
-                {lang === "en" ? "Manage Connections" : "Administrar Conexiones"}
+                {lang === "en" ? "View all" : "Ver todas"}
+                <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
+            }
+          >
+
+            {!overviewLoaded ? (
+              <div className="mt-5 space-y-3" aria-hidden="true">
+                <div className="z-shimmer h-12" />
+                <div className="z-shimmer h-12" />
+                <div className="z-shimmer h-12" />
+              </div>
+            ) : recentConversations.length === 0 ? (
+              <EmptyState
+                icon={MessageSquare}
+                title={lang === "en" ? "No conversations yet" : "Aún no hay conversaciones"}
+                description={
+                  lang === "en"
+                    ? "Your customers' conversations will appear here."
+                    : "Aquí aparecerán las conversaciones de tus clientes."
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {recentConversations.map((conversation) => (
+                  <li key={conversation.id}>
+                    <Link
+                      href="/conversations"
+                      className="group flex items-center gap-3 py-3.5 transition-transform hover:translate-x-1"
+                    >
+                      <PersonAvatar name={conversation.customer} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold">
+                          {conversation.customer}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {conversation.lastMessage}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-mono text-[0.68rem] text-muted-foreground">
+                        {conversation.time}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        </Rise>
+
+        {/* Conexiones */}
+        <Rise delay={400}>
+          <SectionCard
+            tone="green"
+            icon={Cable}
+            kicker={lang === "en" ? "Connections" : "Conexiones"}
+            title={lang === "en" ? "Your channels" : "Tus canales"}
+            bodyClassName="flex flex-col py-3 sm:py-3"
+          >
+            <div className="flex-1 divide-y divide-border">
+              <div className="flex items-center gap-3 py-3.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-whatsapp text-white">
+                  <WhatsAppIcon />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold">WhatsApp</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {lang === "en" ? "We connect it with you" : "Te acompañamos a conectarlo"}
+                  </span>
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 py-3.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-text">
+                  <Calendar className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold">Google Calendar</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {lang === "en" ? "Your schedule" : "Tu agenda"}
+                  </span>
+                </span>
+                {googleConnected !== null && (
+                  <StatusPill tone={googleConnected ? "success" : "warning"}>
+                    {googleConnected
+                      ? lang === "en"
+                        ? "Connected"
+                        : "Conectado"
+                      : lang === "en"
+                        ? "Pending"
+                        : "Pendiente"}
+                  </StatusPill>
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+
+            <Link
+              href="/integrations"
+              className="my-2 inline-flex items-center gap-1 text-[0.8rem] font-bold text-brand-text underline-offset-4 hover:underline"
+            >
+              {lang === "en" ? "Manage connections" : "Administrar conexiones"}
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </SectionCard>
+        </Rise>
       </div>
 
-      {/* Quick Chat Simulator Modal ("Probar mi Agente") */}
+      {/* Simulador rápido */}
       {simOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col h-[520px]">
-            <div className="px-5 py-4 bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
-                  IA
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                    {lang === "en" ? "Test my Agent" : "Probar mi Agente"}
-                  </h3>
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    {tenant.name}
-                  </p>
+        <Modal
+          onClose={() => setSimOpen(false)}
+          labelledBy="sim-title"
+          className="flex h-[min(560px,calc(100vh-2rem))] flex-col overflow-hidden rounded-3xl"
+        >
+          <div className="flex items-center gap-3 bg-coffee px-4 py-3 text-on-coffee">
+            <ZabioMark size={28} tone="white" />
+            <div className="min-w-0 flex-1">
+              <h2 id="sim-title" className="truncate text-sm font-bold">
+                {lang === "en" ? "Test my agent" : "Probar mi agente"}
+              </h2>
+              <p className="truncate font-mono text-[0.65rem] text-on-coffee-soft">{tenant.name}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSimOpen(false)}
+              aria-label={lang === "en" ? "Close" : "Cerrar"}
+              className="cursor-pointer rounded-lg p-1.5 text-on-coffee-soft transition-colors hover:text-on-coffee"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div ref={simScrollRef} className="flex flex-1 flex-col gap-2.5 overflow-y-auto bg-muted p-4">
+            {simMessages.length === 0 && !simLoading && (
+              <EmptyState
+                className="my-auto"
+                icon={Sparkles}
+                title={lang === "en" ? "Say hello" : "Salúdalo"}
+                description={
+                  lang === "en"
+                    ? "Write as if you were a customer. Nothing is sent to anyone."
+                    : "Escribe como si fueras un cliente. Esto no le llega a nadie."
+                }
+              />
+            )}
+            {simMessages.map((msg) => (
+              <div key={msg.id}>
+                {msg.actionLabel && (
+                  <StatusPill tone="success" className="mb-1.5">
+                    {msg.actionLabel}
+                  </StatusPill>
+                )}
+                <div
+                  className={`z-bubble ${msg.role === "user" ? "z-bubble-customer" : "z-bubble-agent"}`}
+                >
+                  {msg.text}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setSimOpen(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-zinc-50/40 dark:bg-zinc-950/40 flex flex-col">
-              {simMessages.length === 0 && !simLoading && (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-zinc-400 space-y-2.5 my-auto">
-                  <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                    <Sparkles className="h-5 w-5" />
-                  </div>
-                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                    {lang === "en" ? "Ready to test your agent" : "Listo para probar tu agente"}
-                  </p>
-                  <p className="text-xs max-w-xs text-zinc-400 dark:text-zinc-500">
-                    {lang === "en"
-                      ? "Start chatting with your assistant by writing below."
-                      : "Inicia la conversación escribiéndole un saludo a tu asistente abajo."}
-                  </p>
-                </div>
-              )}
-              {simMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${
-                    msg.role === "user" ? "items-end" : "items-start"
-                  }`}
-                >
-                  {msg.actionLabel && (
-                    <span className="mb-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
-                      {msg.actionLabel}
-                    </span>
-                  )}
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-indigo-600 text-white rounded-br-xs"
-                        : "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/70 dark:border-zinc-700/70 rounded-bl-xs shadow-2xs"
-                    }`}
-                  >
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-              {simLoading && (
-                <div className="text-xs text-zinc-400 italic px-2">
-                  {lang === "en" ? "Agent is typing..." : "El asistente está escribiendo..."}
-                </div>
-              )}
-            </div>
-
-            <form
-              onSubmit={handleQuickSimSend}
-              className="p-3 bg-white dark:bg-zinc-900 border-t border-zinc-200/80 dark:border-zinc-800 flex gap-2"
-            >
-              <Input
-                value={simInput}
-                onChange={(e) => setSimInput(e.target.value)}
-                placeholder={
-                  lang === "en"
-                    ? "Write a message as a customer..."
-                    : "Escribe como si fueras un cliente..."
-                }
-                className="text-xs h-9"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                disabled={simLoading}
-                className="h-9 w-9 bg-indigo-600 hover:bg-indigo-500 text-white shrink-0 cursor-pointer"
-              >
-                <Send className="h-3.5 w-3.5" />
-              </Button>
-            </form>
+            ))}
+            {simLoading && (
+              <div className="z-bubble z-bubble-agent">
+                <TypingDots label={lang === "en" ? "Agent is typing" : "El agente está escribiendo"} />
+              </div>
+            )}
           </div>
-        </div>
+
+          <form onSubmit={handleQuickSimSend} className="flex gap-2 border-t border-border p-3">
+            <Input
+              autoFocus
+              value={simInput}
+              onChange={(e) => setSimInput(e.target.value)}
+              aria-label={lang === "en" ? "Your message" : "Tu mensaje"}
+              placeholder={lang === "en" ? "Write a message..." : "Escribe un mensaje..."}
+              className="rounded-full"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={simLoading || !simInput.trim()}
+              aria-label={lang === "en" ? "Send" : "Enviar"}
+            >
+              <Send />
+            </Button>
+          </form>
+        </Modal>
       )}
     </div>
   );

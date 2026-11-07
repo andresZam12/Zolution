@@ -2,29 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  Sparkles,
-  Bot,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  ListPlus,
-  RefreshCw,
-  Plus,
-  Trash2,
-  Clock,
-  DollarSign,
-  Calendar,
-  CreditCard,
-  Briefcase,
-} from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, ArrowRight, Check, Clock, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { ZabioLogo } from "@/components/zabio-logo";
+import { Field, Notice, Rise } from "@/components/zabio-ui";
 import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 import { generateDefaultPrompt } from "@/lib/tenant";
 
@@ -233,13 +218,14 @@ export default function OnboardingPage() {
 
     const compiledLocal = buildLocalMasterPrompt();
     setGeneratedPrompt(compiledLocal);
-    setFeedbackNotice("¡Master Context generado exitosamente para tu empresa!");
+    setFeedbackNotice(null);
     setIsGeneratingWithAI(false);
     setStep(4);
   };
 
   const handleFinishOnboarding = async () => {
     setIsSavingFinish(true);
+    setFeedbackNotice(null);
     const cleanName = companyName.trim();
 
     if (cleanName) {
@@ -286,614 +272,449 @@ export default function OnboardingPage() {
           },
         }),
       });
-    } catch {
-      // Guardado local
-    } finally {
-      setIsSavingFinish(false);
       window.dispatchEvent(new Event("storage"));
       router.push("/agent");
+    } catch {
+      setFeedbackNotice("No se pudo guardar tu agente. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setIsSavingFinish(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-10 px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
-      <div className="max-w-2xl mx-auto w-full space-y-6">
-        {/* Header y Progreso */}
-        <div className="text-center space-y-2">
-          <Badge
-            variant="outline"
-            className="text-xs bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
-          >
-            Paso {step} de 4
-          </Badge>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Crea tu Asistente de Negocio
-          </h1>
-          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-            Responde 3 preguntas sencillas sobre tu empresa y al final la IA construirá un Master Context perfecto para tu sector.
-          </p>
+  const stepCopy: Record<number, { kicker: string; title: string; text: string }> = {
+    1: {
+      kicker: "Tu negocio",
+      title: "¿Cuál es tu negocio?",
+      text: "Con esto tu agente sabrá a quién representa.",
+    },
+    2: {
+      kicker: "Tus servicios",
+      title: "¿Qué ofreces?",
+      text: "Agrega lo que tus clientes pueden preguntar o agendar.",
+    },
+    3: {
+      kicker: "Tu forma de atender",
+      title: "¿Cómo atiendes?",
+      text: "Para que tu agente agende con exactitud.",
+    },
+    4: {
+      kicker: "Pruébalo",
+      title: "Tu agente está listo",
+      text: "Armamos estas instrucciones con tus respuestas. Puedes ajustarlas antes de guardar.",
+    },
+  };
+  const current = stepCopy[step];
 
-          {/* Barra de progreso */}
-          <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mt-4">
-            <div
-              className="bg-indigo-600 h-full transition-all duration-300"
-              style={{ width: `${(step / 4) * 100}%` }}
+  const chipClass = (selected: boolean) =>
+    cn(
+      "cursor-pointer rounded-xl border p-3 text-left transition-all",
+      selected
+        ? "border-brand bg-brand-soft text-foreground"
+        : "border-input bg-card text-muted-foreground hover:border-brand/50"
+    );
+
+  return (
+    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-4 py-8 sm:px-6">
+      <div className="flex items-center justify-between">
+        <ZabioLogo size={28} />
+        <span className="font-mono text-[0.72rem] text-muted-foreground">
+          Paso {step} de 4
+        </span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-4 gap-1.5" aria-hidden="true">
+        {[1, 2, 3, 4].map((n) => (
+          <span key={n} className="h-1 overflow-hidden rounded-full bg-border">
+            <span
+              className={cn(
+                "block h-full bg-brand transition-all duration-500 ease-out",
+                n <= step ? "w-full" : "w-0"
+              )}
             />
-          </div>
-        </div>
+          </span>
+        ))}
+      </div>
+
+      <div key={step} className="mt-10 flex-1">
+        <Rise>
+          <p className="z-kicker">/ {current.kicker}</p>
+          <h1 className="z-title mt-2.5 text-4xl sm:text-5xl">{current.title}</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{current.text}</p>
+        </Rise>
 
         {feedbackNotice && (
-          <div className="flex items-center justify-between text-xs px-4 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs">
-            <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
-              {feedbackNotice}
-            </span>
-            <button
-              type="button"
-              onClick={() => setFeedbackNotice(null)}
-              className="text-indigo-600 hover:text-indigo-900 ml-2"
-            >
-              ✕
-            </button>
-          </div>
+          <Notice
+            tone={step === 4 && !isSavingFinish ? "brand" : "danger"}
+            onDismiss={() => setFeedbackNotice(null)}
+            className="mt-5"
+          >
+            {feedbackNotice}
+          </Notice>
         )}
 
-        <Card className="border-zinc-200/70 dark:border-zinc-800/80 shadow-md">
-          {/* PASO 1: TU NEGOCIO (IMPARCIAL Y LIMPIO) */}
+        <Rise delay={100} className="z-card mt-7 space-y-5 p-5 sm:p-6">
+          {/* PASO 1 */}
           {step === 1 && (
             <>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-indigo-500" />
-                  Paso 1: ¿Cuál es tu Negocio?
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Cuéntanos el nombre y la actividad de tu empresa. Funciona para cualquier sector.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Nombre de tu Empresa o Negocio
-                  </label>
+              <Field label="Nombre de tu negocio">
+                <Input
+                  required
+                  autoFocus
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Asesorías Martínez, Café La Terraza..."
+                />
+              </Field>
+
+              <Field label="Sector">
+                <select
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
+                  className="z-select"
+                >
+                  {PREDEFINED_INDUSTRIES.map((ind) => (
+                    <option key={ind} value={ind}>
+                      {ind}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {industry === "Otro (Especificar libremente)" && (
+                <Field label="¿A qué se dedica tu negocio?">
                   <Input
                     required
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Ej. Asesorías Martínez, Café La Terraza, Taller Los Andes..."
-                    className="h-10 text-xs sm:text-sm"
+                    value={customIndustry}
+                    onChange={(e) => setCustomIndustry(e.target.value)}
+                    placeholder="Veterinaria, Academia de baile..."
                   />
-                </div>
+                </Field>
+              )}
 
-                <div className="space-y-1.5">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Sector o Tipo de Actividad
-                  </label>
-                  <select
-                    value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs sm:text-sm"
-                  >
-                    {PREDEFINED_INDUSTRIES.map((ind) => (
-                      <option key={ind} value={ind}>
-                        {ind}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {industry === "Otro (Especificar libremente)" && (
-                  <div className="space-y-1.5">
-                    <label className="font-medium text-indigo-600 dark:text-indigo-400">
-                      Especifica a qué se dedica tu negocio:
-                    </label>
-                    <Input
-                      required
-                      value={customIndustry}
-                      onChange={(e) => setCustomIndustry(e.target.value)}
-                      placeholder="Ej. Veterinaria, Academia de baile, Empresa de mensajería..."
-                      className="h-10 text-xs border-indigo-300 dark:border-indigo-800"
-                    />
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Ciudad o País
-                    </label>
-                    <Input
-                      value={cityOrCountry}
-                      onChange={(e) => setCityOrCountry(e.target.value)}
-                      placeholder="Ej. Bogotá, Colombia"
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      WhatsApp de Atención
-                    </label>
-                    <Input
-                      value={whatsappPhone}
-                      onChange={(e) => setWhatsappPhone(e.target.value)}
-                      placeholder="+57 300 000 0000"
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-3 flex justify-end">
-                  <Button
-                    onClick={() => setStep(2)}
-                    disabled={!companyName.trim() || (industry === "Otro (Especificar libremente)" && !customIndustry.trim())}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
-                  >
-                    Siguiente: Tus Servicios o Productos
-                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Ciudad o país">
+                  <Input
+                    value={cityOrCountry}
+                    onChange={(e) => setCityOrCountry(e.target.value)}
+                    placeholder="Bogotá, Colombia"
+                  />
+                </Field>
+                <Field label="WhatsApp de atención">
+                  <Input
+                    value={whatsappPhone}
+                    onChange={(e) => setWhatsappPhone(e.target.value)}
+                    placeholder="+57 300 000 0000"
+                  />
+                </Field>
+              </div>
             </>
           )}
 
-          {/* PASO 2: TUS SERVICIOS O PRODUCTOS (LIMPIO Y EDITABLE) */}
+          {/* PASO 2 */}
           {step === 2 && (
             <>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <ListPlus className="h-5 w-5 text-indigo-500" />
-                  Paso 2: ¿Qué Servicios o Productos Ofreces?
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Agrega los servicios principales que los clientes pueden consultar o agendar.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                {/* Lista de servicios añadidos */}
-                <div className="space-y-2">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    Servicios Registrados ({serviceItems.length})
-                  </label>
-                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                    {serviceItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800"
+              <ul className="space-y-2">
+                {serviceItems.map((item, idx) => (
+                  <li
+                    key={idx}
+                    className="z-rise flex items-center justify-between gap-3 rounded-xl bg-muted p-3"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold">{item.name}</span>
+                      <span className="mt-0.5 flex items-center gap-2 font-mono text-[0.68rem] text-muted-foreground">
+                        {item.price_cop
+                          ? `$${Number(item.price_cop).toLocaleString("es-CO")} COP`
+                          : "Precio a convenir"}
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {item.duration_unit === "a convenir"
+                            ? "A convenir"
+                            : `${item.duration_value} ${item.duration_unit}`}
+                        </span>
+                      </span>
+                    </span>
+                    {serviceItems.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => handleRemoveService(idx)}
+                        aria-label={`Quitar ${item.name}`}
+                        className="hover:bg-danger-soft hover:text-danger"
                       >
-                        <div className="flex-1 min-w-0 pr-3">
-                          <p className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                            {item.name}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-500">
-                            <span className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                              <DollarSign className="w-3 h-3" />
-                              {item.price_cop
-                                ? `$${Number(item.price_cop).toLocaleString("es-CO")} COP`
-                                : "Precio a convenir"}
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {item.duration_unit === "a convenir"
-                                ? "A convenir"
-                                : `${item.duration_value} ${item.duration_unit}`}
-                            </span>
-                          </div>
-                        </div>
-                        {serviceItems.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveService(idx)}
-                            className="h-7 w-7 text-zinc-400 hover:text-red-500 cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                        <Trash2 />
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
 
-                {/* Formulario rápido para agregar otro servicio */}
-                <div className="p-3 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
-                  <p className="font-medium text-zinc-700 dark:text-zinc-300">
-                    + Añadir un servicio o producto
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                    <div className="sm:col-span-5">
-                      <Input
-                        value={newServiceName}
-                        onChange={(e) => setNewServiceName(e.target.value)}
-                        placeholder="Nombre (ej: Desarrollo Web, Asesoría, Consulta...)"
-                        className="h-8 text-xs bg-white dark:bg-zinc-950"
-                      />
-                    </div>
-                    <div className="sm:col-span-3">
-                      <Input
-                        type="number"
-                        value={newServicePrice}
-                        onChange={(e) => setNewServicePrice(e.target.value)}
-                        placeholder="Precio COP (opcional)"
-                        className="h-8 text-xs bg-white dark:bg-zinc-950"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      {newServiceDurationUnit !== "a convenir" ? (
-                        <Input
-                          type="number"
-                          min={1}
-                          value={newServiceDurationValue}
-                          onChange={(e) => setNewServiceDurationValue(e.target.value)}
-                          placeholder="Cant."
-                          className="h-8 text-xs bg-white dark:bg-zinc-950 text-center"
-                        />
-                      ) : (
-                        <div className="h-8 flex items-center justify-center text-[10px] text-zinc-400 border rounded-md border-zinc-200 dark:border-zinc-800">
-                          Libre
-                        </div>
-                      )}
-                    </div>
-                    <div className="sm:col-span-2">
-                      <select
-                        value={newServiceDurationUnit}
-                        onChange={(e) => setNewServiceDurationUnit(e.target.value as ServiceDurationUnit)}
-                        className="w-full h-8 px-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs"
-                      >
-                        <option value="minutos">minutos</option>
-                        <option value="horas">horas</option>
-                        <option value="días">días</option>
-                        <option value="semanas">semanas</option>
-                        <option value="meses">meses</option>
-                        <option value="a convenir">A convenir</option>
-                      </select>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleAddService}
-                    disabled={!newServiceName.trim()}
-                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white text-xs h-7.5 cursor-pointer"
+              <div className="space-y-3 border-t border-border pt-5">
+                <Field label="Agregar otro">
+                  <Input
+                    value={newServiceName}
+                    onChange={(e) => setNewServiceName(e.target.value)}
+                    placeholder="Nombre del servicio o producto"
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Input
+                    type="number"
+                    value={newServicePrice}
+                    onChange={(e) => setNewServicePrice(e.target.value)}
+                    aria-label="Precio en pesos"
+                    placeholder="Precio COP"
+                    className="col-span-2"
+                  />
+                  {newServiceDurationUnit !== "a convenir" ? (
+                    <Input
+                      type="number"
+                      min={1}
+                      value={newServiceDurationValue}
+                      onChange={(e) => setNewServiceDurationValue(e.target.value)}
+                      aria-label="Duración"
+                      className="text-center"
+                    />
+                  ) : (
+                    <span className="grid h-10 place-items-center text-xs text-muted-foreground">
+                      Libre
+                    </span>
+                  )}
+                  <select
+                    value={newServiceDurationUnit}
+                    onChange={(e) => setNewServiceDurationUnit(e.target.value as ServiceDurationUnit)}
+                    aria-label="Unidad de duración"
+                    className="z-select"
                   >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    Añadir al listado
-                  </Button>
+                    <option value="minutos">minutos</option>
+                    <option value="horas">horas</option>
+                    <option value="días">días</option>
+                    <option value="semanas">semanas</option>
+                    <option value="meses">meses</option>
+                    <option value="a convenir">A convenir</option>
+                  </select>
                 </div>
-
-                <div className="pt-2 flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => setStep(1)}
-                    className="text-xs h-9 cursor-pointer"
-                  >
-                    <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                    Atrás
-                  </Button>
-                  <Button
-                    onClick={() => setStep(3)}
-                    disabled={serviceItems.length === 0}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer"
-                  >
-                    Siguiente: Horarios y Operación
-                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddService}
+                  disabled={!newServiceName.trim()}
+                >
+                  <Plus />
+                  Agregar a la lista
+                </Button>
+              </div>
             </>
           )}
 
-          {/* PASO 3: MODALIDAD, HORARIOS, FESTIVOS Y OPERACIÓN */}
+          {/* PASO 3 */}
           {step === 3 && (
             <>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-indigo-500" />
-                  Paso 3: Modalidad, Horarios y Reglas
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Define cómo opera tu negocio para que el asistente agende citas o reuniones con exactitud.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                {/* Modalidad Principal de Atención */}
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                    <Briefcase className="w-4 h-4 text-indigo-500" />
-                    ¿Cómo atiendes o interactúas con tus clientes?
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {[
-                      {
-                        id: "virtual" as const,
-                        title: "💻 Reuniones Virtuales / Demos",
-                        desc: "Google Meet o Zoom (Software, consultoría, cursos)",
-                      },
-                      {
-                        id: "presencial" as const,
-                        title: "🏢 Presencial en Sede / Local",
-                        desc: "Oficina, consultorio, local o tienda física",
-                      },
-                      {
-                        id: "domicilio" as const,
-                        title: "🚗 A Domicilio / En Terreno",
-                        desc: "Visitas técnicas, inspecciones o terreno",
-                      },
-                      {
-                        id: "hibrida" as const,
-                        title: "🔄 Híbrida / Según el Cliente",
-                        desc: "El cliente elige si prefiere virtual o presencial",
-                      },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setInteractionModality(m.id)}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                          interactionModality === m.id
-                            ? "bg-indigo-50/80 border-indigo-600 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-200 shadow-2xs"
-                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
-                        }`}
-                      >
-                        <p className="font-semibold text-xs">{m.title}</p>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">{m.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Horarios semanales */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Horario Lunes a Viernes
-                    </label>
-                    <Input
-                      value={scheduleWeekdays}
-                      onChange={(e) => setScheduleWeekdays(e.target.value)}
-                      placeholder="Lunes a Viernes: 8:00 AM - 6:00 PM"
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Horario Sábados / Fines de Semana
-                    </label>
-                    <Input
-                      value={scheduleSaturdays}
-                      onChange={(e) => setScheduleSaturdays(e.target.value)}
-                      placeholder="Sábados: 9:00 AM - 1:00 PM"
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Días Festivos (Chips) */}
-                <div className="space-y-1.5">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                    ¿Cómo atienden los días festivos?
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {[
-                      "Cerrado en días festivos",
-                      "Solo hasta mediodía (8:00 AM - 1:00 PM)",
-                      "Atención en jornada habitual",
-                    ].map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setHolidayPolicy(opt)}
-                        className={`p-2.5 rounded-lg border text-left text-xs font-medium transition-colors cursor-pointer ${
-                          holidayPolicy === opt
-                            ? "bg-indigo-50 border-indigo-600 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300"
-                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Tolerancia y Cancelación */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      {interactionModality === "virtual"
-                        ? "Tolerancia de conexión a la videollamada"
-                        : "Tolerancia de espera al cliente"}
-                    </label>
-                    <div className="flex gap-2">
-                      {[10, 15, 20].map((mins) => (
-                        <button
-                          key={mins}
-                          type="button"
-                          onClick={() => setToleranceMinutes(mins)}
-                          className={`flex-1 py-1.5 rounded-lg border text-xs font-medium cursor-pointer ${
-                            toleranceMinutes === mins
-                              ? "bg-indigo-600 border-indigo-600 text-white"
-                              : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
-                          }`}
-                        >
-                          {mins} min
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Aviso para cancelaciones
-                    </label>
-                    <select
-                      value={cancellationNotice}
-                      onChange={(e) => setCancellationNotice(e.target.value)}
-                      className="w-full h-8 px-2.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs"
+              <div className="space-y-1.5">
+                <p className="text-[0.8rem] font-semibold">Modalidad</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {[
+                    { id: "virtual" as const, title: "Virtual", desc: "Google Meet o Zoom" },
+                    { id: "presencial" as const, title: "Presencial", desc: "En tu sede o local" },
+                    { id: "domicilio" as const, title: "A domicilio", desc: "Visitas o trabajo en terreno" },
+                    { id: "hibrida" as const, title: "Híbrida", desc: "El cliente elige" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      aria-pressed={interactionModality === m.id}
+                      onClick={() => setInteractionModality(m.id)}
+                      className={chipClass(interactionModality === m.id)}
                     >
-                      <option value="Mínimo 2 horas de anticipación">Mínimo 2 horas antes</option>
-                      <option value="Mínimo 4 horas de anticipación">Mínimo 4 horas antes</option>
-                      <option value="Mismo día con aviso oportuno">Mismo día</option>
-                      <option value="Mínimo 24 horas de anticipación">24 horas de anticipación</option>
-                    </select>
-                  </div>
+                      <span className="block text-sm font-bold text-foreground">{m.title}</span>
+                      <span className="mt-0.5 block text-xs">{m.desc}</span>
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Medios de Pago (Tags) */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Lunes a viernes">
+                  <Input
+                    value={scheduleWeekdays}
+                    onChange={(e) => setScheduleWeekdays(e.target.value)}
+                    placeholder="Lunes a Viernes: 8:00 AM - 6:00 PM"
+                  />
+                </Field>
+                <Field label="Fines de semana">
+                  <Input
+                    value={scheduleSaturdays}
+                    onChange={(e) => setScheduleSaturdays(e.target.value)}
+                    placeholder="Sábados: 9:00 AM - 1:00 PM"
+                  />
+                </Field>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-[0.8rem] font-semibold">Días festivos</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {[
+                    "Cerrado en días festivos",
+                    "Solo hasta mediodía (8:00 AM - 1:00 PM)",
+                    "Atención en jornada habitual",
+                  ].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      aria-pressed={holidayPolicy === opt}
+                      onClick={() => setHolidayPolicy(opt)}
+                      className={cn(chipClass(holidayPolicy === opt), "text-xs font-semibold")}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-zinc-500" />
-                    Medios de pago que aceptas
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      "Nequi / Daviplata",
-                      "Transferencia Bancolombia",
-                      "Tarjetas débito/crédito",
-                      "Efectivo",
-                      "PSE",
-                    ].map((method) => {
-                      const isSelected = paymentMethods.includes(method);
-                      return (
-                        <button
-                          key={method}
-                          type="button"
-                          onClick={() => togglePaymentMethod(method)}
-                          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                            isSelected
-                              ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : "bg-zinc-50 border-zinc-200 text-zinc-500 dark:bg-zinc-900 dark:border-zinc-800"
-                          }`}
-                        >
-                          {isSelected ? "✓ " : "+ "}
-                          {method}
-                        </button>
-                      );
-                    })}
+                  <p className="text-[0.8rem] font-semibold">
+                    {interactionModality === "virtual"
+                      ? "Tolerancia para conectarse"
+                      : "Tolerancia de espera"}
+                  </p>
+                  <div className="flex gap-2">
+                    {[10, 15, 20].map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        aria-pressed={toleranceMinutes === mins}
+                        onClick={() => setToleranceMinutes(mins)}
+                        className={cn(
+                          chipClass(toleranceMinutes === mins),
+                          "flex-1 px-1 py-2 text-center text-xs font-bold"
+                        )}
+                      >
+                        {mins} min
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Asistente */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Nombre de tu Asistente
-                    </label>
-                    <Input
-                      value={agentName}
-                      onChange={(e) => setAgentName(e.target.value)}
-                      placeholder="Ej. Sofía, Carlos, Mateo, Alex..."
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-zinc-700 dark:text-zinc-300">
-                      Tono de Conversación
-                    </label>
-                    <Input
-                      value={tone}
-                      onChange={(e) => setTone(e.target.value)}
-                      placeholder="Ej. Cercano, profesional, cálido..."
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
+                <Field label="Aviso para cancelar">
+                  <select
+                    value={cancellationNotice}
+                    onChange={(e) => setCancellationNotice(e.target.value)}
+                    className="z-select"
+                  >
+                    <option value="Mínimo 2 horas de anticipación">2 horas antes</option>
+                    <option value="Mínimo 4 horas de anticipación">4 horas antes</option>
+                    <option value="Mismo día con aviso oportuno">Mismo día</option>
+                    <option value="Mínimo 24 horas de anticipación">24 horas antes</option>
+                  </select>
+                </Field>
+              </div>
 
-                <div className="pt-2 flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => setStep(2)}
-                    className="text-xs h-9 cursor-pointer"
-                  >
-                    <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                    Atrás
-                  </Button>
-                  <Button
-                    onClick={handleGenerateWithAI}
-                    disabled={isGeneratingWithAI}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer font-medium"
-                  >
-                    {isGeneratingWithAI ? (
-                      <>
-                        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Construyendo con IA...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                        ✨ Enriquecer y Armar Prompt con IA
-                      </>
-                    )}
-                  </Button>
+              <div className="space-y-1.5">
+                <p className="text-[0.8rem] font-semibold">Medios de pago</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "Nequi / Daviplata",
+                    "Transferencia Bancolombia",
+                    "Tarjetas débito/crédito",
+                    "Efectivo",
+                    "PSE",
+                  ].map((method) => {
+                    const isSelected = paymentMethods.includes(method);
+                    return (
+                      <button
+                        key={method}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => togglePaymentMethod(method)}
+                        className={cn(
+                          "inline-flex cursor-pointer items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                          isSelected
+                            ? "border-transparent bg-success-soft text-success"
+                            : "border-input bg-card text-muted-foreground hover:border-brand/50"
+                        )}
+                      >
+                        {isSelected ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                        {method}
+                      </button>
+                    );
+                  })}
                 </div>
-              </CardContent>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Nombre de tu agente">
+                  <Input
+                    value={agentName}
+                    onChange={(e) => setAgentName(e.target.value)}
+                    placeholder="Sofía, Mateo, Alex..."
+                  />
+                </Field>
+                <Field label="Tono">
+                  <Input
+                    value={tone}
+                    onChange={(e) => setTone(e.target.value)}
+                    placeholder="Cercano, profesional, cálido..."
+                  />
+                </Field>
+              </div>
             </>
           )}
 
-          {/* PASO 4: MASTER CONTEXT CONSTRUIDO POR IA (BASADO EN SUS RESPUESTAS) */}
+          {/* PASO 4 */}
           {step === 4 && (
-            <>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    Paso 4: Master Context Listo para tu Negocio
-                  </CardTitle>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs">
-                    Optimizado
-                  </Badge>
-                </div>
-                <CardDescription className="text-xs">
-                  La IA estructuró la información de tu empresa en una guía operativa blindada con reglas de agenda y protocolo de Calendar.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                <Textarea
-                  rows={13}
-                  value={generatedPrompt}
-                  onChange={(e) => setGeneratedPrompt(e.target.value)}
-                  className="text-xs leading-relaxed font-mono bg-zinc-50 dark:bg-zinc-900 resize-y"
-                />
-
-                <div className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 space-y-1">
-                  <p className="font-semibold flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                    Protocolo de Google Calendar Incluido
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    Tu agente ya sabe consultar disponibilidad y registrar citas automáticamente cuando el cliente confirme fecha y hora.
-                  </p>
-                </div>
-
-                <div className="pt-2 flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => setStep(3)}
-                    className="text-xs h-9 cursor-pointer"
-                  >
-                    <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                    Ajustar Datos
-                  </Button>
-                  <Button
-                    onClick={handleFinishOnboarding}
-                    disabled={isSavingFinish}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 cursor-pointer font-medium"
-                  >
-                    {isSavingFinish ? (
-                      <>
-                        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        Guardar y Probar en el Simulador
-                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </>
+            <Textarea
+              rows={14}
+              value={generatedPrompt}
+              onChange={(e) => setGeneratedPrompt(e.target.value)}
+              aria-label="Instrucciones de tu agente"
+              className="max-h-[28rem] min-h-72! resize-y leading-relaxed"
+            />
           )}
-        </Card>
+        </Rise>
+
+        <div className="mt-6 flex items-center justify-between gap-3 pb-6">
+          {step > 1 ? (
+            <Button variant="ghost" onClick={() => setStep(step - 1)}>
+              <ArrowLeft />
+              Atrás
+            </Button>
+          ) : (
+            <span />
+          )}
+
+          {step === 1 && (
+            <Button
+              onClick={() => setStep(2)}
+              disabled={
+                !companyName.trim() ||
+                (industry === "Otro (Especificar libremente)" && !customIndustry.trim())
+              }
+            >
+              Siguiente
+              <ArrowRight />
+            </Button>
+          )}
+          {step === 2 && (
+            <Button onClick={() => setStep(3)} disabled={serviceItems.length === 0}>
+              Siguiente
+              <ArrowRight />
+            </Button>
+          )}
+          {step === 3 && (
+            <Button onClick={handleGenerateWithAI} disabled={isGeneratingWithAI}>
+              Preparar mi agente
+              <ArrowRight />
+            </Button>
+          )}
+          {step === 4 && (
+            <Button onClick={handleFinishOnboarding} disabled={isSavingFinish}>
+              {isSavingFinish ? <RefreshCw className="animate-spin" /> : null}
+              {isSavingFinish ? "Guardando..." : "Guardar y probarlo"}
+              {!isSavingFinish && <ArrowRight />}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
